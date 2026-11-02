@@ -71,6 +71,7 @@ El PIN vive solo ahí, nunca en GitHub.
 ## Uso diario
 
 - **Agregar un centro de costo:** en la app, en la lista de centros elige **+ Agregar centro de costo…** (o escríbelo en una fila nueva de la hoja **Centros**). No borres ni renombres centros que ya tienen gastos: el resumen los agrupa por nombre.
+- **Cuentas dentro de un centro** (ej. Vicky: Sueldo, Contribuciones, Traslado): al elegir un centro aparecen sus cuentas para marcar una (es opcional); **+ Nueva cuenta** agrega otra a ese centro. Quedan en la hoja **Cuentas** (columna A el centro, B la cuenta) y cada gasto guarda la suya en la columna **Cuenta** de la hoja Gastos. La hoja **Resumen por cuenta** suma por mes, centro y cuenta.
 - **Corregir un gasto:** bórralo desde la lista "Últimos gastos" y vuelve a ingresarlo, o edítalo directo en la hoja **Gastos**.
 - **Métricas:** en la app, las pestañas **Por centro** (gráfico circular por centro de costo, por mes o año) y **Meses** (últimos 12 meses). En la planilla, las hojas **Resumen mensual** y **Resumen anual** las escribe el script cada vez que se guarda o borra un gasto desde la app. Si editas la hoja **Gastos** a mano, en script.google.com elige la función **actualizarResumenes** y presiona **Ejecutar**.
 - **Descargar como Excel:** **Archivo → Descargar → Microsoft Excel (.xlsx)**.

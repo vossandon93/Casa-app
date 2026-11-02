@@ -137,6 +137,13 @@
       padding: 6px 14px; font: inherit; font-size: 14px; cursor: pointer;
     }
     .atajos button.activo { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+    .cuentas { display: flex; flex-wrap: wrap; gap: 8px; }
+    .cuentas button {
+      border: 1px solid var(--border); background: none; color: var(--text); border-radius: 999px;
+      padding: 9px 14px; font: inherit; font-size: 15px; cursor: pointer;
+    }
+    .cuentas button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+    .cuentas button.nueva { border-style: dashed; color: var(--muted); }
     .cal { margin-top: 8px; border: 1px solid var(--border); border-radius: 14px; padding: 10px; background: var(--bg); }
     .cal-top { display: flex; align-items: center; justify-content: space-between; font-weight: 700; margin-bottom: 6px; text-transform: capitalize; }
     .cal-top button, .periodo button.flecha {
@@ -174,6 +181,10 @@
     .detalle .que { min-width: 0; }
     .detalle .quien { color: var(--muted); font-size: 12px; }
     .detalle .cuanto { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .detalle li.grupo { border-top: 1px solid var(--border); padding-top: 10px; font-weight: 600; color: var(--text); }
+    .detalle li.grupo:first-child { border-top: 0; padding-top: 7px; }
+    .detalle li.grupo + li { border-top: 0; }
+    .detalle li.en-grupo { padding-left: 12px; }
     .leyenda .l1 { display: flex; align-items: center; gap: 10px; font-weight: 600; }
     .leyenda .punto { width: 12px; height: 12px; border-radius: 50%; flex: none; }
     .leyenda .nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -247,6 +258,11 @@
     <form class="card" id="form-gasto" novalidate>
       <label for="centro">Centro de costo</label>
       <select id="centro" required></select>
+
+      <div id="cuenta-campo" hidden>
+        <label>Cuenta (opcional)</label>
+        <div class="cuentas" id="cuentas"></div>
+      </div>
 
       <label for="monto">Monto</label>
       <input id="monto" class="monto" type="text" inputmode="numeric" placeholder="$0" autocomplete="off">
@@ -332,7 +348,7 @@
   var API = window.GASTOS_API_URL;
   var $ = function (id) { return document.getElementById(id); };
   var clp = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
-  var estado = { pin: leer('pin'), persona: leer('persona'), centros: [], personas: [], fecha: '', filas: null, detalles: {} };
+  var estado = { pin: leer('pin'), persona: leer('persona'), centros: [], personas: [], cuentas: {}, cuenta: '', fecha: '', filas: null, detalles: {} };
 
   function leer(k) { try { return localStorage.getItem('gastos.' + k) || ''; } catch (e) { return ''; } }
   function guardar(k, v) { try { v ? localStorage.setItem('gastos.' + k, v) : localStorage.removeItem('gastos.' + k); } catch (e) {} }
@@ -406,7 +422,8 @@
   function usarConfig(res) {
     estado.centros = res.centros;
     estado.personas = res.personas;
-    guardar('config', JSON.stringify({ centros: res.centros, personas: res.personas }));
+    estado.cuentas = res.cuentas || {};
+    guardar('config', JSON.stringify({ centros: res.centros, personas: res.personas, cuentas: estado.cuentas }));
   }
 
   function elegirPersona() {
@@ -473,6 +490,59 @@
     nuevo.textContent = '+ Agregar centro de costo…';
     sel.appendChild(nuevo);
     if (elegido && estado.centros.indexOf(elegido) !== -1) sel.value = elegido;
+    pintarCuentas();
+  }
+
+  // Cuentas del centro elegido (ej. Vicky: Sueldo, Contribuciones, Traslado). Un toque
+  // la marca, otro la desmarca; es opcional.
+  function pintarCuentas() {
+    var centro = $('centro').value;
+    var campo = $('cuenta-campo');
+    var cont = $('cuentas');
+    if (!centro || centro === AGREGAR) { campo.hidden = true; estado.cuenta = ''; return; }
+    var lista = estado.cuentas[centro] || [];
+    if (lista.indexOf(estado.cuenta) === -1) estado.cuenta = '';
+    campo.hidden = false;
+    cont.innerHTML = '';
+    lista.forEach(function (c) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = c;
+      b.setAttribute('aria-pressed', String(estado.cuenta === c));
+      b.addEventListener('click', function () {
+        estado.cuenta = estado.cuenta === c ? '' : c;
+        pintarCuentas();
+      });
+      cont.appendChild(b);
+    });
+    var nueva = document.createElement('button');
+    nueva.type = 'button';
+    nueva.className = 'nueva';
+    nueva.textContent = '+ Nueva cuenta';
+    nueva.addEventListener('click', function () { agregarCuenta(centro, nueva); });
+    cont.appendChild(nueva);
+  }
+
+  function agregarCuenta(centro, boton) {
+    var nombre = (prompt('Nueva cuenta para ' + centro + ':') || '').replace(/\s+/g, ' ').trim();
+    if (!nombre) return;
+    var lista = estado.cuentas[centro] || [];
+    var existente = lista.filter(function (c) { return c.toLowerCase() === nombre.toLowerCase(); })[0];
+    if (existente) { estado.cuenta = existente; return pintarCuentas(); }
+    boton.disabled = true;
+    api('addCuenta', { centro: centro, nombre: nombre }).then(function (res) {
+      usarConfig(res);
+      var creada = (estado.cuentas[centro] || []).filter(function (c) { return c.toLowerCase() === nombre.toLowerCase(); })[0];
+      if (creada) estado.cuenta = creada;
+      pintarCuentas();
+      mensaje($('gasto-msg'), '✓ Cuenta agregada a ' + centro + ': ' + (creada || nombre), 'ok');
+    }).catch(function (err) {
+      boton.disabled = false;
+      var texto = /Acción desconocida/.test(err.message)
+        ? 'El script de Google está desactualizado: pega el Code.gs nuevo y publica una "Nueva versión".'
+        : err.message;
+      mensaje($('gasto-msg'), 'No se pudo agregar: ' + texto, 'err');
+    });
   }
 
   var AGREGAR = '__agregar__';
@@ -481,7 +551,7 @@
   $('centro').addEventListener('focus', function () { centroAnterior = this.value; });
   $('centro').addEventListener('change', function () {
     var sel = this;
-    if (sel.value !== AGREGAR) return;
+    if (sel.value !== AGREGAR) { estado.cuenta = ''; return pintarCuentas(); }
     var volver = function () { sel.value = centroAnterior; if (!sel.value) sel.selectedIndex = 0; };
     var nombre = (prompt('Nombre del nuevo centro de costo:') || '').trim();
     if (!nombre) return volver();
@@ -493,6 +563,7 @@
       pintarCentros();
       var creado = res.centros.filter(function (c) { return c.toLowerCase() === nombre.toLowerCase(); })[0];
       if (creado) sel.value = creado;
+      pintarCuentas();
       mensaje($('gasto-msg'), '✓ Centro de costo agregado: ' + (creado || nombre), 'ok');
     }).catch(function (err) {
       volver();
@@ -517,6 +588,7 @@
     var msg = $('gasto-msg');
     var monto = montoNumero();
     var centro = $('centro').value;
+    var cuenta = estado.cuenta;
     if (!centro || centro === AGREGAR) return mensaje(msg, 'Elige un centro de costo', 'err');
     if (!monto) return mensaje(msg, 'Ingresa el monto', 'err');
 
@@ -525,16 +597,19 @@
     boton.textContent = 'Guardando…';
     api('add', {
       centro: centro,
+      cuenta: cuenta,
       monto: monto,
       descripcion: $('descripcion').value.trim(),
       fecha: estado.fecha || hoy(),
       persona: estado.persona
     }).then(function (res) {
-      mensaje(msg, '✓ Guardado: ' + clp.format(monto) + ' en ' + centro, 'ok');
+      mensaje(msg, '✓ Guardado: ' + clp.format(monto) + ' en ' + centro + (cuenta ? ' · ' + cuenta : ''), 'ok');
       $('monto').value = '';
       $('descripcion').value = '';
       ponerFecha(hoy());
       $('centro').selectedIndex = 0;
+      estado.cuenta = '';
+      pintarCuentas();
       estado.filas = null;
       estado.detalles = {};
       pintarLista(res);
@@ -586,7 +661,7 @@
       var l1 = document.createElement('div');
       l1.className = 'linea1';
       var c = document.createElement('span');
-      c.textContent = g.centro;
+      c.textContent = g.centro + (g.cuenta ? ' · ' + g.cuenta : '');
       var m = document.createElement('span');
       m.textContent = clp.format(g.monto);
       l1.append(c, m);
@@ -865,19 +940,47 @@
       return ul;
     }
     if (!lista.length) ul.innerHTML = '<li class="vacio">Sin gastos.</li>';
-    lista.slice().sort(function (a, b) { return a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0; }).forEach(function (g) {
+    var ordenada = lista.slice().sort(function (a, b) { return a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0; });
+    var conCuenta = ordenada.some(function (g) { return g.cuenta; });
+    if (!conCuenta) { ordenada.forEach(function (g) { ul.appendChild(filaDetalle(g, false)); }); return ul; }
+    // Con cuentas: un subtotal por cuenta (la mayor arriba, "Sin cuenta" al final) y sus gastos debajo.
+    var grupos = {};
+    ordenada.forEach(function (g) {
+      var k = g.cuenta || '';
+      grupos[k] = grupos[k] || { total: 0, gastos: [] };
+      grupos[k].total += g.monto;
+      grupos[k].gastos.push(g);
+    });
+    Object.keys(grupos).sort(function (a, b) {
+      if (!a) return 1;
+      if (!b) return -1;
+      return grupos[b].total - grupos[a].total;
+    }).forEach(function (k) {
       var li = document.createElement('li');
+      li.className = 'grupo';
       var que = document.createElement('div'); que.className = 'que';
-      que.textContent = g.descripcion || 'Sin descripción';
-      var quien = document.createElement('div'); quien.className = 'quien';
-      quien.textContent = fechaCorta(g.fecha) + ' · ' + g.persona;
-      que.appendChild(quien);
+      que.textContent = k || 'Sin cuenta';
       var cuanto = document.createElement('div'); cuanto.className = 'cuanto';
-      cuanto.textContent = clp.format(g.monto);
+      cuanto.textContent = clp.format(grupos[k].total);
       li.append(que, cuanto);
       ul.appendChild(li);
+      grupos[k].gastos.forEach(function (g) { ul.appendChild(filaDetalle(g, true)); });
     });
     return ul;
+  }
+
+  function filaDetalle(g, enGrupo) {
+    var li = document.createElement('li');
+    if (enGrupo) li.className = 'en-grupo';
+    var que = document.createElement('div'); que.className = 'que';
+    que.textContent = g.descripcion || 'Sin descripción';
+    var quien = document.createElement('div'); quien.className = 'quien';
+    quien.textContent = fechaCorta(g.fecha) + ' · ' + g.persona;
+    que.appendChild(quien);
+    var cuanto = document.createElement('div'); cuanto.className = 'cuanto';
+    cuanto.textContent = clp.format(g.monto);
+    li.append(que, cuanto);
+    return li;
   }
 
   function svg(tag, attrs) {
@@ -1106,6 +1209,7 @@
     if (guardada) {
       estado.centros = guardada.centros;
       estado.personas = guardada.personas;
+      estado.cuentas = guardada.cuentas || {};
       if (estado.personas.indexOf(estado.persona) !== -1) iniciarApp();
       else elegirPersona();
     }
