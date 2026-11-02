@@ -15,6 +15,9 @@ var HOJA_CUENTAS = 'Cuentas';
 var HOJA_RESUMEN_MENSUAL = 'Resumen mensual';
 var HOJA_RESUMEN_ANUAL = 'Resumen anual';
 var HOJA_RESUMEN_CUENTAS = 'Resumen por cuenta';
+var HOJA_RENDICIONES = 'Rendiciones';
+var HOJA_AZUCAR = 'Azúcar';
+var HOJA_PROTEINA = 'Proteína';
 
 var COLUMNAS_GASTOS = ['ID', 'Fecha', 'Centro de costo', 'Monto', 'Descripción', 'Registró', 'Creado', 'Cuenta'];
 var CENTROS_INICIALES = ['Farmacia', 'Luna', 'Supermercado', 'Fran'];
@@ -22,8 +25,14 @@ var PERSONAS_INICIALES = ['Vicente', 'Fran'];
 // Cuentas que se crean solas si existe un centro con ese nombre (sin importar mayúsculas).
 var CUENTAS_INICIALES = { 'Vicky': ['Sueldo', 'Contribuciones', 'Traslado'], 'Nana': ['Sueldo', 'Contribuciones', 'Traslado'] };
 var ULTIMOS_GASTOS = 20;
+var COLUMNAS_RENDICIONES = ['ID', 'Fecha', 'Monto', 'Descripción', 'Comprobante', 'Estado', 'Correo', 'Registró', 'Creado'];
+var COLUMNAS_AZUCAR = ['Fecha', 'Evento', 'Creado'];
+var COLUMNAS_PROTEINA = ['ID', 'Fecha', 'Gramos', 'Alimento', 'Creado'];
+var CARPETA_RENDICIONES = 'Rendiciones - comprobantes';
+var META_PROTEINA_INICIAL = 100;
+var ULTIMAS_RENDICIONES = 50;
 // Se muestra al abrir la URL /exec: sirve para comprobar que Google tiene el código nuevo.
-var VERSION = '2026-11-02 · cuentas dentro de cada centro';
+var VERSION = '2026-11-02 · cuentas + rendiciones y salud';
 
 // ---------------------------------------------------------------------------
 // Instalación: ejecutar una vez desde el editor (botón "Ejecutar" con setup).
@@ -85,6 +94,14 @@ function setup() {
 
   crearResumenes_(ss);
 
+  prepararHoja_(ss, HOJA_RENDICIONES, COLUMNAS_RENDICIONES);
+  prepararHoja_(ss, HOJA_AZUCAR, COLUMNAS_AZUCAR);
+  prepararHoja_(ss, HOJA_PROTEINA, COLUMNAS_PROTEINA);
+
+  // Pide (una vez) los permisos de Drive y Gmail que usan las rendiciones.
+  carpetaRendiciones_();
+  MailApp.getRemainingDailyQuota();
+
   var hoja1 = ss.getSheetByName('Hoja 1') || ss.getSheetByName('Sheet1');
   if (hoja1 && hoja1.getLastRow() === 0 && ss.getSheets().length > 1) {
     ss.deleteSheet(hoja1);
@@ -93,6 +110,33 @@ function setup() {
   if (!PropertiesService.getScriptProperties().getProperty('PIN')) {
     Logger.log('Falta definir el PIN en Configuración del proyecto > Propiedades del script.');
   }
+  if (!PropertiesService.getScriptProperties().getProperty('CORREO_RENDICION')) {
+    Logger.log('Para que las rendiciones se envíen por correo, define CORREO_RENDICION en Propiedades del script.');
+  }
+}
+
+// Crea la hoja con sus encabezados y formatos si no existe. Se usa también
+// desde la API, así las hojas nuevas aparecen aunque no se vuelva a correr setup.
+function prepararHoja_(ss, nombre, columnas) {
+  var hoja = ss.getSheetByName(nombre);
+  if (hoja && hoja.getLastRow() > 0) return hoja;
+  hoja = hoja || ss.insertSheet(nombre);
+  hoja.appendRow(columnas);
+  hoja.setFrozenRows(1);
+  hoja.getRange(1, 1, 1, columnas.length).setFontWeight('bold');
+  columnas.forEach(function (c, i) {
+    var col = hoja.getRange(1, i + 1, hoja.getMaxRows(), 1);
+    if (c === 'Fecha') col.setNumberFormat('dd/mm/yyyy');
+    if (c === 'Creado') col.setNumberFormat('dd/mm/yyyy hh:mm');
+    if (c === 'Monto') col.setNumberFormat('$#,##0');
+  });
+  hoja.getRange(1, 1, 1, columnas.length).setNumberFormat('@');
+  if (columnas[0] === 'ID') hoja.hideColumns(1);
+  return hoja;
+}
+
+function hoja_(nombre, columnas) {
+  return prepararHoja_(libro_(), nombre, columnas);
 }
 
 // Los resúmenes se escriben como valores calculados por el script (sin fórmulas
@@ -243,6 +287,38 @@ function doPost(e) {
         return json_({ ok: true, filas: totalesPorMes_() });
       case 'detalle':
         return json_({ ok: true, gastos: gastosDeCentro_(body.centro, body.periodo) });
+
+      // Rendiciones (pestaña de Vicente)
+      case 'rendiciones':
+        return json_(Object.assign({ ok: true }, listarRendiciones_()));
+      case 'rendicionAdd':
+        var correo = agregarRendicion_(body);
+        return json_(Object.assign({ ok: true, correo: correo }, listarRendiciones_()));
+      case 'rendicionEstado':
+        cambiarEstadoRendicion_(body.id, body.estado);
+        return json_(Object.assign({ ok: true }, listarRendiciones_()));
+      case 'rendicionDelete':
+        borrarRendicion_(body.id);
+        return json_(Object.assign({ ok: true }, listarRendiciones_()));
+
+      // Salud (pestaña de Fran): días sin azúcar y proteína diaria
+      case 'salud':
+        return json_(Object.assign({ ok: true }, datosSalud_()));
+      case 'azucarEvento':
+        agregarEventoAzucar_(body.evento, body.fecha);
+        return json_(Object.assign({ ok: true }, datosSalud_()));
+      case 'azucarDeshacer':
+        deshacerEventoAzucar_();
+        return json_(Object.assign({ ok: true }, datosSalud_()));
+      case 'proteinaAdd':
+        agregarProteina_(body);
+        return json_(Object.assign({ ok: true }, datosSalud_()));
+      case 'proteinaDelete':
+        borrarFilaPorId_(hoja_(HOJA_PROTEINA, COLUMNAS_PROTEINA), body.id);
+        return json_(Object.assign({ ok: true }, datosSalud_()));
+      case 'proteinaMeta':
+        cambiarMetaProteina_(body.meta);
+        return json_(Object.assign({ ok: true }, datosSalud_()));
       default:
         throw new Error('Acción desconocida');
     }
@@ -443,6 +519,223 @@ function parsearFecha_(texto) {
   if (!m) return new Date();
   // Mediodía para que ningún cambio de zona horaria mueva el día.
   return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0);
+}
+
+// ---------------------------------------------------------------------------
+// Rendiciones: gasto + foto del comprobante. La foto queda en Drive, la fila en
+// la hoja Rendiciones y se manda un correo con la foto adjunta a CORREO_RENDICION.
+// ---------------------------------------------------------------------------
+
+function agregarRendicion_(body) {
+  var monto = Math.round(Number(body.monto));
+  var descripcion = String(body.descripcion || '').trim().slice(0, 200);
+  var persona = String(body.persona || '').trim();
+  var fecha = parsearFecha_(body.fecha);
+  if (!(monto > 0)) throw new Error('Monto inválido');
+  if (!descripcion) throw new Error('Escribe una descripción');
+  if (leerLista_(HOJA_PERSONAS).indexOf(persona) === -1) throw new Error('Persona inválida');
+  if (!body.foto) throw new Error('Falta la foto del comprobante');
+
+  var tz = libro_().getSpreadsheetTimeZone();
+  var tipo = /^(image\/(jpeg|png|webp|heic|heif)|application\/pdf)$/.test(body.fotoTipo) ? body.fotoTipo : 'image/jpeg';
+  var bytes = Utilities.base64Decode(String(body.foto));
+  if (bytes.length > 15 * 1024 * 1024) throw new Error('El archivo es muy grande (máx. 15 MB)');
+  var ext = tipo === 'application/pdf' ? 'pdf' : tipo === 'image/jpeg' ? 'jpg' : tipo.split('/')[1];
+  var nombre = (Utilities.formatDate(fecha, tz, 'yyyy-MM-dd') + ' ' + pesos_(monto) + ' ' + descripcion.slice(0, 60))
+    .replace(/[\\/:*?"<>|]/g, '-') + '.' + ext;
+  var blob = Utilities.newBlob(bytes, tipo, nombre);
+  var archivo = carpetaRendiciones_().createFile(blob);
+
+  var r = { fecha: fecha, monto: monto, descripcion: descripcion, persona: persona, url: archivo.getUrl() };
+  var correo = enviarCorreoRendicion_(r, blob, tz);
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    hoja_(HOJA_RENDICIONES, COLUMNAS_RENDICIONES).appendRow([
+      Utilities.getUuid(), fecha, monto, descripcion, r.url, 'Pendiente', correo.texto, persona, new Date()
+    ]);
+  } finally {
+    lock.releaseLock();
+  }
+  return correo;
+}
+
+function enviarCorreoRendicion_(r, blob, tz) {
+  var para = String(PropertiesService.getScriptProperties().getProperty('CORREO_RENDICION') || '').trim();
+  if (!para) return { enviado: false, texto: 'No enviado: falta CORREO_RENDICION en Propiedades del script' };
+  var fechaTxt = Utilities.formatDate(r.fecha, tz, 'dd/MM/yyyy');
+  var asunto = 'Rendición ' + fechaTxt + ' · ' + pesos_(r.monto) + ' · ' + r.descripcion;
+  var texto = 'Rendición de gasto\n\n' +
+    'Fecha: ' + fechaTxt + '\nMonto: ' + pesos_(r.monto) + '\nDescripción: ' + r.descripcion +
+    '\nRegistró: ' + r.persona + '\n\nComprobante adjunto y en Drive: ' + r.url;
+  var html = '<p><b>Rendición de gasto</b></p><table cellpadding="4">' +
+    '<tr><td>Fecha</td><td><b>' + fechaTxt + '</b></td></tr>' +
+    '<tr><td>Monto</td><td><b>' + pesos_(r.monto) + '</b></td></tr>' +
+    '<tr><td>Descripción</td><td>' + html_(r.descripcion) + '</td></tr>' +
+    '<tr><td>Registró</td><td>' + html_(r.persona) + '</td></tr></table>' +
+    '<p>Comprobante adjunto. También está en <a href="' + r.url + '">Google Drive</a>.</p>';
+  try {
+    MailApp.sendEmail({ to: para, subject: asunto, body: texto, htmlBody: html, attachments: [blob] });
+    return { enviado: true, para: para, texto: 'Enviado a ' + para + ' el ' + Utilities.formatDate(new Date(), tz, 'dd/MM/yyyy HH:mm') };
+  } catch (err) {
+    return { enviado: false, texto: 'No enviado: ' + err.message };
+  }
+}
+
+function carpetaRendiciones_() {
+  var props = PropertiesService.getScriptProperties();
+  var id = props.getProperty('CARPETA_RENDICIONES_ID');
+  if (id) {
+    try {
+      var carpeta = DriveApp.getFolderById(id);
+      if (!carpeta.isTrashed()) return carpeta;
+    } catch (e) {}
+  }
+  var nueva = DriveApp.createFolder(CARPETA_RENDICIONES);
+  props.setProperty('CARPETA_RENDICIONES_ID', nueva.getId());
+  return nueva;
+}
+
+function listarRendiciones_() {
+  var hoja = hoja_(HOJA_RENDICIONES, COLUMNAS_RENDICIONES);
+  if (hoja.getLastRow() < 2) return { rendiciones: [], pendiente: 0 };
+  var tz = libro_().getSpreadsheetTimeZone();
+  var todas = hoja.getRange(2, 1, hoja.getLastRow() - 1, COLUMNAS_RENDICIONES.length).getValues()
+    .filter(function (f) { return f[0]; })
+    .map(function (f) {
+      return {
+        id: f[0],
+        fecha: f[1] instanceof Date ? Utilities.formatDate(f[1], tz, 'yyyy-MM-dd') : String(f[1]),
+        monto: Number(f[2]) || 0,
+        descripcion: f[3],
+        foto: f[4],
+        estado: f[5] || 'Pendiente',
+        correo: f[6],
+        persona: f[7]
+      };
+    });
+  var pendiente = todas.reduce(function (s, r) { return r.estado === 'Reembolsada' ? s : s + r.monto; }, 0);
+  todas.sort(function (a, b) { return a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0; });
+  return { rendiciones: todas.slice(0, ULTIMAS_RENDICIONES), pendiente: pendiente };
+}
+
+function cambiarEstadoRendicion_(id, estado) {
+  if (['Pendiente', 'Reembolsada'].indexOf(estado) === -1) throw new Error('Estado inválido');
+  var hoja = hoja_(HOJA_RENDICIONES, COLUMNAS_RENDICIONES);
+  hoja.getRange(filaDeId_(hoja, id), 6).setValue(estado);
+}
+
+function borrarRendicion_(id) {
+  var hoja = hoja_(HOJA_RENDICIONES, COLUMNAS_RENDICIONES);
+  var fila = filaDeId_(hoja, id);
+  var url = String(hoja.getRange(fila, 5).getValue());
+  var m = /[-\w]{25,}/.exec(url);
+  if (m) {
+    try { DriveApp.getFileById(m[0]).setTrashed(true); } catch (e) {}
+  }
+  borrarFilaPorId_(hoja, id);
+}
+
+// ---------------------------------------------------------------------------
+// Salud: contador de días sin azúcar y proteína diaria.
+// ---------------------------------------------------------------------------
+
+function datosSalud_() {
+  var tz = libro_().getSpreadsheetTimeZone();
+  var hojaA = hoja_(HOJA_AZUCAR, COLUMNAS_AZUCAR);
+  var eventos = hojaA.getLastRow() < 2 ? [] : hojaA.getRange(2, 1, hojaA.getLastRow() - 1, 2).getValues()
+    .filter(function (f) { return f[0] instanceof Date; })
+    .map(function (f) { return { fecha: Utilities.formatDate(f[0], tz, 'yyyy-MM-dd'), evento: String(f[1]) }; });
+
+  var hojaP = hoja_(HOJA_PROTEINA, COLUMNAS_PROTEINA);
+  var filas = hojaP.getLastRow() < 2 ? [] : hojaP.getRange(2, 1, hojaP.getLastRow() - 1, 4).getValues()
+    .filter(function (f) { return f[0] && f[1] instanceof Date; })
+    .map(function (f) {
+      return { id: f[0], fecha: Utilities.formatDate(f[1], tz, 'yyyy-MM-dd'), gramos: Number(f[2]) || 0, alimento: String(f[3]) };
+    });
+  var desde = new Date();
+  desde.setDate(desde.getDate() - 35);
+  desde = Utilities.formatDate(desde, tz, 'yyyy-MM-dd');
+
+  // Alimentos más usados (con sus últimos gramos) para agregarlos de un toque.
+  var usados = {};
+  filas.slice(-300).forEach(function (f) {
+    var k = f.alimento.toLowerCase();
+    if (!k) return;
+    usados[k] = { alimento: f.alimento, gramos: f.gramos, veces: ((usados[k] || {}).veces || 0) + 1 };
+  });
+  var frecuentes = Object.keys(usados).map(function (k) { return usados[k]; })
+    .sort(function (a, b) { return b.veces - a.veces; }).slice(0, 8);
+
+  return {
+    azucar: { eventos: eventos },
+    proteina: {
+      meta: Number(PropertiesService.getScriptProperties().getProperty('PROTEINA_META')) || META_PROTEINA_INICIAL,
+      registros: filas.filter(function (f) { return f.fecha >= desde; }),
+      frecuentes: frecuentes
+    }
+  };
+}
+
+function agregarEventoAzucar_(evento, fecha) {
+  var nombres = { inicio: 'Inicio', recaida: 'Comí azúcar' };
+  if (!nombres[evento]) throw new Error('Evento inválido');
+  hoja_(HOJA_AZUCAR, COLUMNAS_AZUCAR).appendRow([parsearFecha_(fecha), nombres[evento], new Date()]);
+}
+
+function deshacerEventoAzucar_() {
+  var hoja = hoja_(HOJA_AZUCAR, COLUMNAS_AZUCAR);
+  if (hoja.getLastRow() < 2) throw new Error('No hay nada que deshacer');
+  hoja.deleteRow(hoja.getLastRow());
+}
+
+function agregarProteina_(body) {
+  var gramos = Math.round(Number(body.gramos));
+  var alimento = String(body.alimento || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  if (!(gramos > 0 && gramos <= 500)) throw new Error('Gramos inválidos');
+  if (!alimento) throw new Error('Escribe qué comiste');
+  hoja_(HOJA_PROTEINA, COLUMNAS_PROTEINA).appendRow([Utilities.getUuid(), parsearFecha_(body.fecha), gramos, alimento, new Date()]);
+}
+
+function cambiarMetaProteina_(meta) {
+  meta = Math.round(Number(meta));
+  if (!(meta >= 10 && meta <= 500)) throw new Error('Meta inválida');
+  PropertiesService.getScriptProperties().setProperty('PROTEINA_META', String(meta));
+}
+
+// ---------------------------------------------------------------------------
+// Utilidades
+// ---------------------------------------------------------------------------
+
+function filaDeId_(hoja, id) {
+  if (!id) throw new Error('Falta el ID');
+  var ultima = hoja.getLastRow();
+  if (ultima >= 2) {
+    var ids = hoja.getRange(2, 1, ultima - 1, 1).getValues();
+    for (var i = ids.length - 1; i >= 0; i--) {
+      if (ids[i][0] === id) return i + 2;
+    }
+  }
+  throw new Error('Registro no encontrado');
+}
+
+function borrarFilaPorId_(hoja, id) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    hoja.deleteRow(filaDeId_(hoja, id));
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function pesos_(n) {
+  return '$' + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+function html_(t) {
+  return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function json_(obj) {
