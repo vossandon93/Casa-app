@@ -31,6 +31,8 @@ var CUENTAS_INICIALES = {
 };
 // Cuentas que cambiaron de nombre: { centro: { 'nombre viejo': 'nombre nuevo' } }.
 var CUENTAS_RENOMBRADAS = { 'Vicky': { 'Contribuciones': 'Imposiciones' } };
+// Centros antiguos que se juntan con otro (la cuenta se mantiene): { 'viejo': 'nuevo' }.
+var CENTROS_RENOMBRADOS = { 'Nana': 'Vicky' };
 var ULTIMOS_GASTOS = 20;
 var COLUMNAS_RENDICIONES = ['ID', 'Fecha', 'Monto', 'Descripción', 'Comprobante', 'Estado', 'Correo', 'Registró', 'Creado'];
 var COLUMNAS_AZUCAR = ['Fecha', 'Evento', 'Creado'];
@@ -153,7 +155,7 @@ function hoja_(nombre, columnas) {
 // 2. Mueve los gastos antiguos cuyo centro ahora es una cuenta (Luna, Supermercado,
 //    Farmacia…) a su centro nuevo, con esa cuenta. Se cambia la MISMA fila: no se
 //    copia nada, así que ningún gasto queda en dos centros ni se suma doble.
-// 3. Renombra cuentas (Vicky / Contribuciones → Imposiciones).
+// 3. Junta centros antiguos (Nana → Vicky) y renombra cuentas (Contribuciones → Imposiciones).
 // 4. Antes de tocar nada guarda una copia de la hoja Gastos ("Gastos respaldo …").
 // Se puede ejecutar de nuevo sin problema: lo que ya está ordenado no cambia.
 // ---------------------------------------------------------------------------
@@ -201,6 +203,9 @@ function reordenarCentrosYCuentas() {
         if (!f[0] && !f[3]) return;
         var centro = String(f[2]).trim(), cuenta = String(f[7] || '').trim();
         var antes = centro + (cuenta ? ' / ' + cuenta : '');
+        Object.keys(CENTROS_RENOMBRADOS).forEach(function (viejo) {
+          if (centro.toLowerCase() === viejo.toLowerCase()) centro = CENTROS_RENOMBRADOS[viejo];
+        });
         var nuevo = centroOficial[centro.toLowerCase()];
         if (nuevo) {
           centro = nuevo;
