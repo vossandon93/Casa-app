@@ -209,7 +209,12 @@
     .dato .t { font-size: 13px; color: var(--muted); }
     .dato .v { font-size: 18px; font-weight: 700; margin-top: 2px; }
     .dato .s { font-size: 13px; color: var(--muted); }
-    .tabs.muchas button { font-size: 14px; padding: 10px 2px; }
+    .subtabs { display: flex; gap: 4px; padding: 3px; margin: -4px 0 16px; background: var(--card); border: 1px solid var(--border); border-radius: 999px; }
+    .subtabs button {
+      flex: 1; border: 0; background: none; color: var(--muted); font: inherit; font-size: 15px; font-weight: 600;
+      padding: 8px 4px; border-radius: 999px; cursor: pointer;
+    }
+    .subtabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-text); }
 
     /* Rendición */
     .foto-btn {
@@ -291,12 +296,18 @@
       <button class="link" id="cambiar" type="button"></button>
     </header>
 
-    <nav class="tabs" role="tablist">
+    <!-- Burbuja principal: secciones -->
+    <nav class="tabs" id="secciones" role="tablist">
+      <button type="button" role="tab" data-sec="casa" aria-selected="true">🏠 Casa</button>
+      <button type="button" role="tab" data-sec="rendicion" aria-selected="false" hidden>🧾 Rendición</button>
+      <button type="button" role="tab" data-sec="salud" aria-selected="false" hidden>💪 Salud</button>
+    </nav>
+
+    <!-- Burbuja de Casa: sus pestañas -->
+    <nav class="subtabs" id="sub-casa" role="tablist">
       <button type="button" role="tab" data-pag="anotar" aria-selected="true">Anotar</button>
       <button type="button" role="tab" data-pag="resumen" aria-selected="false">Por centro</button>
       <button type="button" role="tab" data-pag="meses" aria-selected="false">Meses</button>
-      <button type="button" role="tab" data-pag="rendicion" aria-selected="false" hidden>Rendición</button>
-      <button type="button" role="tab" data-pag="salud" aria-selected="false" hidden>Salud</button>
     </nav>
 
     <div id="pag-anotar">
@@ -593,11 +604,13 @@
     cargarLista();
   }
 
-  // ---------- Pestañas personales ----------
-  // Cada persona ve, además de las pestañas comunes, las suyas. La clave es el
-  // nombre de la hoja Personas en minúsculas y sin tildes.
+  // ---------- Secciones personales ----------
+  // En la burbuja de arriba todos ven "Casa" y cada persona además sus secciones.
+  // La clave es el nombre de la hoja Personas en minúsculas y sin tildes.
+  // Para agregar una sección nueva: un botón data-sec en #secciones, su div pag-xxx y su nombre aquí.
   var PESTANAS_DE = { vicente: ['rendicion'], fran: ['salud'] };
   var PERSONALES = ['rendicion', 'salud'];
+  var DE_CASA = ['anotar', 'resumen', 'meses'];
 
   function clavePersona(p) {
     return String(p || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -606,11 +619,12 @@
   function pintarPestanas() {
     var mias = PESTANAS_DE[clavePersona(estado.persona)] || [];
     var visibles = 0;
-    document.querySelectorAll('.tabs button').forEach(function (b) {
-      b.hidden = PERSONALES.indexOf(b.dataset.pag) !== -1 && mias.indexOf(b.dataset.pag) === -1;
+    document.querySelectorAll('#secciones button').forEach(function (b) {
+      b.hidden = b.dataset.sec !== 'casa' && mias.indexOf(b.dataset.sec) === -1;
       if (!b.hidden) visibles++;
     });
-    document.querySelector('.tabs').classList.toggle('muchas', visibles > 3);
+    // Si solo queda "Casa", la burbuja de arriba no aporta nada.
+    $('secciones').hidden = visibles < 2;
     if (PERSONALES.indexOf(pagina) !== -1 && mias.indexOf(pagina) === -1) irA('anotar');
   }
 
@@ -909,15 +923,26 @@
 
   // ---------- Pestañas ----------
   var pagina = 'anotar';
-  document.querySelectorAll('.tabs button').forEach(function (b) {
+  var ultimaDeCasa = 'anotar';
+  document.querySelectorAll('#secciones button').forEach(function (b) {
+    // Casa vuelve a la última pestaña que se usó dentro de Casa.
+    b.addEventListener('click', function () { irA(b.dataset.sec === 'casa' ? ultimaDeCasa : b.dataset.sec); });
+  });
+  document.querySelectorAll('#sub-casa button').forEach(function (b) {
     b.addEventListener('click', function () { irA(b.dataset.pag); });
   });
 
   function irA(p) {
     pagina = p;
-    document.querySelectorAll('.tabs button').forEach(function (b) {
+    var enCasa = DE_CASA.indexOf(p) !== -1;
+    if (enCasa) ultimaDeCasa = p;
+    document.querySelectorAll('#secciones button').forEach(function (b) {
+      b.setAttribute('aria-selected', String(b.dataset.sec === (enCasa ? 'casa' : p)));
+    });
+    document.querySelectorAll('#sub-casa button').forEach(function (b) {
       b.setAttribute('aria-selected', String(b.dataset.pag === p));
     });
+    $('sub-casa').hidden = !enCasa;
     ['anotar', 'resumen', 'meses', 'rendicion', 'salud'].forEach(function (n) { $('pag-' + n).hidden = n !== p; });
     window.scrollTo(0, 0);
     if (p === 'resumen' || p === 'meses') cargarResumen();
