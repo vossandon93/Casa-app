@@ -209,6 +209,49 @@
     .dato .t { font-size: 13px; color: var(--muted); }
     .dato .v { font-size: 18px; font-weight: 700; margin-top: 2px; }
     .dato .s { font-size: 13px; color: var(--muted); }
+    .tabs.muchas button { font-size: 14px; padding: 10px 2px; }
+
+    /* Rendición */
+    .foto-btn {
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 120px;
+      border: 2px dashed var(--border); border-radius: 14px; background: var(--bg); color: var(--muted);
+      font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; padding: 10px; overflow: hidden;
+    }
+    .foto-btn img { max-width: 100%; max-height: 220px; border-radius: 10px; }
+    .foto-btn.con-foto { border-style: solid; border-color: var(--accent); }
+    .estado {
+      border: 1px solid var(--border); background: none; border-radius: 999px; padding: 4px 10px;
+      font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; flex: none; color: var(--danger);
+    }
+    .estado.ok { color: var(--ok); background: var(--ok-soft); border-color: transparent; }
+    .lista .linea2 a { color: var(--accent); }
+
+    /* Salud */
+    .racha { text-align: center; padding: 6px 0 2px; }
+    .racha .num { font-size: 64px; font-weight: 800; line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
+    .racha .txt { color: var(--muted); margin-top: 4px; }
+    .btn.peligro { background: var(--err-soft); color: var(--danger); }
+    .semanas { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 14px; }
+    .semanas .dow { font-size: 11px; color: var(--muted); text-align: center; }
+    .semanas i { display: block; aspect-ratio: 1; border-radius: 6px; background: var(--bg); }
+    .semanas i.limpio { background: var(--s3); }
+    .semanas i.recaida { background: var(--danger); }
+    .semanas i.hoy { outline: 2px solid var(--text); outline-offset: 1px; }
+    .notas { display: flex; gap: 14px; justify-content: center; font-size: 12px; color: var(--muted); margin-top: 8px; }
+    .notas span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; background: var(--c); }
+    .progreso { height: 14px; border-radius: 7px; background: var(--bg); overflow: hidden; margin: 8px 0 4px; }
+    .progreso i { display: block; height: 100%; background: var(--accent); border-radius: 7px; transition: width .3s; }
+    .progreso.lista-meta i { background: var(--ok); }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .chips button {
+      border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 999px;
+      padding: 8px 12px; font: inherit; font-size: 14px; cursor: pointer;
+    }
+    .chips button b { color: var(--accent); }
+    .dos { display: grid; grid-template-columns: 1fr 110px; gap: 10px; }
+    .barras-cont { position: relative; }
+    .linea-meta { position: absolute; left: 0; right: 0; border-top: 2px dashed var(--muted); pointer-events: none; }
+    .barras i.cumple { background: var(--ok); }
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -252,6 +295,8 @@
       <button type="button" role="tab" data-pag="anotar" aria-selected="true">Anotar</button>
       <button type="button" role="tab" data-pag="resumen" aria-selected="false">Por centro</button>
       <button type="button" role="tab" data-pag="meses" aria-selected="false">Meses</button>
+      <button type="button" role="tab" data-pag="rendicion" aria-selected="false" hidden>Rendición</button>
+      <button type="button" role="tab" data-pag="salud" aria-selected="false" hidden>Salud</button>
     </nav>
 
     <div id="pag-anotar">
@@ -337,6 +382,87 @@
       <section class="card">
         <h2 id="quien-titulo">Quién anotó</h2>
         <ul class="leyenda" id="quien"></ul>
+      </section>
+    </div>
+
+    <!-- Rendición (pestaña personal de Vicente) -->
+    <div id="pag-rendicion" hidden>
+      <form class="card" id="form-rend" novalidate>
+        <input id="rend-archivo" type="file" accept="image/*,application/pdf" hidden>
+        <button class="foto-btn" id="rend-foto" type="button"><span style="font-size:32px">📷</span>Sacar o elegir foto del comprobante</button>
+
+        <label for="rend-monto">Monto</label>
+        <input id="rend-monto" class="monto" type="text" inputmode="numeric" placeholder="$0" autocomplete="off">
+
+        <label for="rend-desc">Descripción</label>
+        <input id="rend-desc" type="text" maxlength="200" placeholder="Ej: almuerzo con cliente, taxi…" autocomplete="off">
+
+        <label for="rend-fecha">Fecha</label>
+        <input id="rend-fecha" type="date">
+
+        <button class="btn" id="rend-guardar" type="submit">Guardar y enviar correo</button>
+        <div id="rend-msg" class="msg" hidden></div>
+      </form>
+
+      <section class="card">
+        <div class="total">Pendiente de reembolso: <strong id="rend-pendiente">—</strong></div>
+      </section>
+
+      <section class="card">
+        <h2>Mis rendiciones</h2>
+        <ul class="lista" id="rend-lista"></ul>
+      </section>
+    </div>
+
+    <!-- Salud (pestaña personal de Fran) -->
+    <div id="pag-salud" hidden>
+      <section class="card">
+        <h2>Días sin azúcar</h2>
+        <div id="azucar"></div>
+        <div id="azucar-msg" class="msg" hidden></div>
+      </section>
+
+      <section class="card">
+        <div class="fila">
+          <h2 style="margin:0">Proteína</h2>
+          <button class="link" id="prot-meta" type="button"></button>
+        </div>
+        <div class="total" id="prot-dia"></div>
+        <div class="grande" id="prot-total">—</div>
+        <div class="progreso" id="prot-barra"><i></i></div>
+        <div class="total" id="prot-falta"></div>
+
+        <form id="form-prot" novalidate>
+          <div class="dos">
+            <div>
+              <label for="prot-alimento">Qué comiste</label>
+              <input id="prot-alimento" type="text" maxlength="60" placeholder="Ej: 2 huevos" autocomplete="off">
+            </div>
+            <div>
+              <label for="prot-gramos">Gramos</label>
+              <input id="prot-gramos" type="text" inputmode="numeric" placeholder="0 g" autocomplete="off">
+            </div>
+          </div>
+          <button class="btn" id="prot-guardar" type="submit">Agregar</button>
+        </form>
+        <div class="total" style="margin-top:14px">Un toque para agregar:</div>
+        <div class="chips" id="prot-chips"></div>
+        <div id="prot-msg" class="msg" hidden></div>
+      </section>
+
+      <section class="card">
+        <h2 id="prot-lista-titulo">Hoy</h2>
+        <ul class="lista" id="prot-lista"></ul>
+      </section>
+
+      <section class="card">
+        <h2>Últimos 7 días</h2>
+        <div class="total" id="prot-semana"></div>
+        <div class="barras-cont">
+          <div class="barras" id="prot-barras"></div>
+          <div class="linea-meta" id="prot-linea"></div>
+        </div>
+        <div class="barras-eje" id="prot-eje"></div>
       </section>
     </div>
   </section>
@@ -463,7 +589,29 @@
     ponerFecha(hoy());
     pintarCentros();
     pintarFaceId();
+    pintarPestanas();
     cargarLista();
+  }
+
+  // ---------- Pestañas personales ----------
+  // Cada persona ve, además de las pestañas comunes, las suyas. La clave es el
+  // nombre de la hoja Personas en minúsculas y sin tildes.
+  var PESTANAS_DE = { vicente: ['rendicion'], fran: ['salud'] };
+  var PERSONALES = ['rendicion', 'salud'];
+
+  function clavePersona(p) {
+    return String(p || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  }
+
+  function pintarPestanas() {
+    var mias = PESTANAS_DE[clavePersona(estado.persona)] || [];
+    var visibles = 0;
+    document.querySelectorAll('.tabs button').forEach(function (b) {
+      b.hidden = PERSONALES.indexOf(b.dataset.pag) !== -1 && mias.indexOf(b.dataset.pag) === -1;
+      if (!b.hidden) visibles++;
+    });
+    document.querySelector('.tabs').classList.toggle('muchas', visibles > 3);
+    if (PERSONALES.indexOf(pagina) !== -1 && mias.indexOf(pagina) === -1) irA('anotar');
   }
 
   function pintarCentros() {
@@ -770,10 +918,431 @@
     document.querySelectorAll('.tabs button').forEach(function (b) {
       b.setAttribute('aria-selected', String(b.dataset.pag === p));
     });
-    ['anotar', 'resumen', 'meses'].forEach(function (n) { $('pag-' + n).hidden = n !== p; });
+    ['anotar', 'resumen', 'meses', 'rendicion', 'salud'].forEach(function (n) { $('pag-' + n).hidden = n !== p; });
     window.scrollTo(0, 0);
-    if (p !== 'anotar') cargarResumen();
+    if (p === 'resumen' || p === 'meses') cargarResumen();
+    if (p === 'rendicion') cargarRendiciones();
+    if (p === 'salud') cargarSalud();
   }
+
+  function scriptViejo(err) {
+    return /Acción desconocida/.test(err.message)
+      ? 'Falta actualizar el script de Google: pega el Code.gs nuevo y publica una "Nueva versión".'
+      : err.message;
+  }
+
+  function mensajeLista(ul, texto) {
+    ul.innerHTML = '<li class="vacio"></li>';
+    ul.firstChild.textContent = texto;
+  }
+
+  function soloNumero(el) { return Number(el.value.replace(/\D/g, '')) || 0; }
+
+  // ---------- Rendición: gasto + foto, con correo automático ----------
+  var rend = { foto: null, cargado: false };
+
+  $('rend-foto').addEventListener('click', function () { $('rend-archivo').click(); });
+  $('rend-monto').addEventListener('input', function () {
+    var n = soloNumero(this);
+    this.value = n ? clp.format(n) : '';
+  });
+
+  $('rend-archivo').addEventListener('change', function () {
+    var file = this.files[0];
+    this.value = '';
+    if (!file) return;
+    var btn = $('rend-foto');
+    btn.textContent = 'Preparando…';
+    prepararArchivo(file).then(function (foto) {
+      rend.foto = foto;
+      btn.innerHTML = '';
+      btn.classList.add('con-foto');
+      if (foto.tipo === 'application/pdf') {
+        btn.textContent = '📄 ' + file.name + ' · tocar para cambiar';
+      } else {
+        var img = document.createElement('img');
+        img.src = 'data:' + foto.tipo + ';base64,' + foto.base64;
+        img.alt = 'Comprobante';
+        btn.appendChild(img);
+        btn.appendChild(document.createTextNode('Tocar para cambiar'));
+      }
+    }).catch(function (err) {
+      limpiarFoto();
+      mensaje($('rend-msg'), err.message, 'err');
+    });
+  });
+
+  function limpiarFoto() {
+    rend.foto = null;
+    var btn = $('rend-foto');
+    btn.classList.remove('con-foto');
+    btn.innerHTML = '<span style="font-size:32px">📷</span>Sacar o elegir foto del comprobante';
+  }
+
+  // Las fotos se achican a 1600 px en JPEG (≈300 KB) para que suban rápido.
+  function prepararArchivo(file) {
+    if (file.type === 'application/pdf') {
+      if (file.size > 10 * 1024 * 1024) return Promise.reject(new Error('El PDF es muy grande (máx. 10 MB)'));
+      return new Promise(function (ok, mal) {
+        var r = new FileReader();
+        r.onload = function () { ok({ tipo: file.type, base64: String(r.result).split(',')[1] }); };
+        r.onerror = function () { mal(new Error('No se pudo leer el archivo')); };
+        r.readAsDataURL(file);
+      });
+    }
+    return new Promise(function (ok, mal) {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () {
+        var MAX = 1600;
+        var k = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+        var c = document.createElement('canvas');
+        c.width = Math.round(img.naturalWidth * k);
+        c.height = Math.round(img.naturalHeight * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        ok({ tipo: 'image/jpeg', base64: c.toDataURL('image/jpeg', 0.8).split(',')[1] });
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); mal(new Error('No se pudo abrir la foto. Prueba con otra.')); };
+      img.src = url;
+    });
+  }
+
+  $('form-rend').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var msg = $('rend-msg');
+    var monto = soloNumero($('rend-monto'));
+    var desc = $('rend-desc').value.trim();
+    if (!rend.foto) return mensaje(msg, 'Agrega la foto del comprobante', 'err');
+    if (!monto) return mensaje(msg, 'Ingresa el monto', 'err');
+    if (!desc) return mensaje(msg, 'Escribe una descripción', 'err');
+    var boton = $('rend-guardar');
+    boton.disabled = true;
+    boton.textContent = 'Subiendo y enviando…';
+    api('rendicionAdd', {
+      monto: monto, descripcion: desc, fecha: $('rend-fecha').value || hoy(), persona: estado.persona,
+      foto: rend.foto.base64, fotoTipo: rend.foto.tipo
+    }).then(function (res) {
+      var c = res.correo || {};
+      mensaje(msg, c.enviado
+        ? '✓ Guardada y enviada por correo a ' + c.para
+        : '✓ Guardada, pero el correo no salió. ' + (c.texto || ''), c.enviado ? 'ok' : 'err');
+      $('rend-monto').value = '';
+      $('rend-desc').value = '';
+      $('rend-fecha').value = hoy();
+      limpiarFoto();
+      pintarRendiciones(res);
+    }).catch(function (err) {
+      mensaje(msg, 'No se guardó: ' + scriptViejo(err), 'err');
+    }).then(function () {
+      boton.disabled = false;
+      boton.textContent = 'Guardar y enviar correo';
+    });
+  });
+
+  function cargarRendiciones() {
+    $('rend-fecha').max = hoy();
+    if (!$('rend-fecha').value) $('rend-fecha').value = hoy();
+    if (!rend.cargado) mensajeLista($('rend-lista'), 'Cargando…');
+    api('rendiciones').then(pintarRendiciones).catch(function (err) {
+      mensajeLista($('rend-lista'), 'No se pudo cargar: ' + scriptViejo(err));
+    });
+  }
+
+  function pintarRendiciones(res) {
+    rend.cargado = true;
+    $('rend-pendiente').textContent = clp.format(res.pendiente || 0);
+    var ul = $('rend-lista');
+    ul.innerHTML = '';
+    if (!res.rendiciones.length) return mensajeLista(ul, 'Todavía no hay rendiciones.');
+    res.rendiciones.forEach(function (r) {
+      var li = document.createElement('li');
+      var info = document.createElement('div'); info.className = 'info';
+      var l1 = document.createElement('div'); l1.className = 'linea1';
+      var d = document.createElement('span'); d.textContent = r.descripcion;
+      d.style.cssText = 'min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+      var m = document.createElement('span'); m.textContent = clp.format(r.monto);
+      l1.append(d, m);
+      var l2 = document.createElement('div'); l2.className = 'linea2';
+      l2.append(fechaCorta(r.fecha) + ' · ');
+      if (r.foto) {
+        var a = document.createElement('a');
+        a.href = r.foto; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'ver foto';
+        l2.append(a, ' · ');
+      }
+      l2.append(/^Enviado/.test(r.correo) ? '✉️ enviado' : '⚠️ sin correo');
+      l2.title = r.correo || '';
+      info.append(l1, l2);
+
+      var est = document.createElement('button');
+      est.type = 'button';
+      var pagada = r.estado === 'Reembolsada';
+      est.className = 'estado' + (pagada ? ' ok' : '');
+      est.textContent = pagada ? 'Pagada' : 'Pendiente';
+      est.setAttribute('aria-label', 'Marcar como ' + (pagada ? 'pendiente' : 'reembolsada'));
+      est.addEventListener('click', function () {
+        est.disabled = true;
+        api('rendicionEstado', { id: r.id, estado: pagada ? 'Pendiente' : 'Reembolsada' })
+          .then(pintarRendiciones)
+          .catch(function (err) { est.disabled = false; alert('No se pudo cambiar: ' + err.message); });
+      });
+
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'borrar'; b.textContent = '✕';
+      b.setAttribute('aria-label', 'Borrar rendición');
+      b.addEventListener('click', function () {
+        if (!confirm('¿Borrar la rendición ' + r.descripcion + ' ' + clp.format(r.monto) + '? La foto se va a la papelera de Drive.')) return;
+        b.disabled = true;
+        api('rendicionDelete', { id: r.id }).then(pintarRendiciones)
+          .catch(function (err) { b.disabled = false; alert('No se pudo borrar: ' + err.message); });
+      });
+      li.append(info, est, b);
+      ul.appendChild(li);
+    });
+  }
+
+  // ---------- Salud: días sin azúcar + proteína diaria ----------
+  var salud = { datos: null, dia: '' };
+  var ALIMENTOS_BASE = [
+    { alimento: 'Huevo', gramos: 6 },
+    { alimento: 'Yogur proteico', gramos: 15 },
+    { alimento: 'Pechuga de pollo 150 g', gramos: 45 },
+    { alimento: 'Atún en lata', gramos: 25 },
+    { alimento: 'Batido de proteína', gramos: 25 },
+    { alimento: 'Vaso de leche', gramos: 8 },
+    { alimento: 'Quesillo 100 g', gramos: 12 },
+    { alimento: 'Carne 150 g', gramos: 40 }
+  ];
+
+  function diasEntre(a, b) { return Math.round((fechaDe(b) - fechaDe(a)) / 864e5); }
+  function sumarDias(iso, n) { var d = fechaDe(iso); d.setDate(d.getDate() + n); return isoDe(d); }
+
+  function cargarSalud() {
+    if (!salud.dia) salud.dia = hoy();
+    if (salud.datos) pintarSalud();
+    else $('azucar').innerHTML = '<div class="vacio">Cargando…</div>';
+    api('salud').then(function (res) { salud.datos = res; pintarSalud(); }).catch(function (err) {
+      if (!salud.datos) $('azucar').innerHTML = '';
+      mensaje($('azucar-msg'), 'No se pudo cargar: ' + scriptViejo(err), 'err');
+    });
+  }
+
+  function accionSalud(accion, datos, el) {
+    if (el) el.disabled = true;
+    var msg = accion.indexOf('proteina') === 0 ? $('prot-msg') : $('azucar-msg');
+    return api(accion, datos).then(function (res) {
+      if (el) el.disabled = false;
+      salud.datos = res;
+      pintarSalud();
+    }, function (err) {
+      if (el) el.disabled = false;
+      mensaje(msg, scriptViejo(err), 'err');
+      throw err;
+    });
+  }
+
+  function pintarSalud() {
+    $('azucar-msg').hidden = true;
+    $('prot-msg').hidden = true;
+    pintarAzucar();
+    pintarProteina();
+  }
+
+  // Cada "Comí azúcar" corta la racha; la nueva parte al día siguiente.
+  function rachasAzucar(eventos) {
+    var orden = eventos.slice().sort(function (a, b) { return a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0; });
+    var inicio = '', record = 0, recaidas = {};
+    orden.forEach(function (e) {
+      if (e.evento === 'Inicio') { if (!inicio) inicio = e.fecha; return; }
+      recaidas[e.fecha] = true;
+      if (inicio) record = Math.max(record, diasEntre(inicio, e.fecha));
+      inicio = sumarDias(e.fecha, 1);
+    });
+    var actual = inicio ? Math.max(0, diasEntre(inicio, hoy())) : null;
+    return { inicio: inicio, actual: actual, record: Math.max(record, actual || 0), recaidas: recaidas, primero: orden.length ? orden[0].fecha : '' };
+  }
+
+  function pintarAzucar() {
+    var cont = $('azucar');
+    cont.innerHTML = '';
+    var eventos = salud.datos.azucar.eventos;
+    var r = rachasAzucar(eventos);
+
+    if (r.actual === null) {
+      var p = document.createElement('p');
+      p.className = 'total';
+      p.textContent = 'Parte el contador el día que dejaste el azúcar. Cada vez que comas, lo reinicias y queda tu récord.';
+      var empezar = document.createElement('button');
+      empezar.type = 'button'; empezar.className = 'btn'; empezar.textContent = 'Empezar hoy';
+      empezar.onclick = function () { accionSalud('azucarEvento', { evento: 'inicio', fecha: hoy() }, empezar).catch(function () {}); };
+      var otro = document.createElement('label');
+      otro.textContent = '¿Empezaste antes? Elige el día:';
+      var fecha = document.createElement('input');
+      fecha.type = 'date'; fecha.max = hoy();
+      fecha.onchange = function () {
+        if (fecha.value) accionSalud('azucarEvento', { evento: 'inicio', fecha: fecha.value }, fecha).catch(function () {});
+      };
+      cont.append(p, empezar, otro, fecha);
+      return;
+    }
+
+    var racha = document.createElement('div'); racha.className = 'racha';
+    var num = document.createElement('div'); num.className = 'num'; num.textContent = r.actual;
+    var txt = document.createElement('div'); txt.className = 'txt';
+    txt.textContent = (r.actual === 1 ? 'día' : 'días') + ' sin azúcar' +
+      (r.record > r.actual ? ' · récord ' + r.record : r.actual > 0 ? ' · ¡es tu récord! 🎉' : '');
+    racha.append(num, txt);
+
+    // Últimas 5 semanas: verde = día sin azúcar, rojo = comió azúcar.
+    var grid = document.createElement('div'); grid.className = 'semanas';
+    ['L', 'M', 'M', 'J', 'V', 'S', 'D'].forEach(function (d) {
+      var e = document.createElement('div'); e.className = 'dow'; e.textContent = d; grid.appendChild(e);
+    });
+    var lunes = sumarDias(hoy(), -((fechaDe(hoy()).getDay() + 6) % 7) - 28);
+    for (var i = 0; i < 35; i++) {
+      var dia = sumarDias(lunes, i);
+      var c = document.createElement('i');
+      if (r.recaidas[dia]) c.className = 'recaida';
+      else if (r.primero && dia >= r.primero && dia < hoy()) c.className = 'limpio';
+      if (dia === hoy()) c.classList.add('hoy');
+      if (dia > hoy()) c.style.opacity = '.35';
+      c.title = fechaCorta(dia);
+      grid.appendChild(c);
+    }
+    var notas = document.createElement('div'); notas.className = 'notas';
+    notas.innerHTML = '<span style="--c:var(--s3)">Sin azúcar</span><span style="--c:var(--danger)">Comí azúcar</span>';
+
+    var comi = document.createElement('button');
+    comi.type = 'button'; comi.className = 'btn peligro'; comi.textContent = 'Comí azúcar hoy';
+    comi.onclick = function () {
+      if (confirm('¿Reiniciar el contador? Llevabas ' + r.actual + ' ' + (r.actual === 1 ? 'día' : 'días') + '.')) {
+        accionSalud('azucarEvento', { evento: 'recaida', fecha: hoy() }, comi).catch(function () {});
+      }
+    };
+    var atajos = document.createElement('div'); atajos.className = 'fila';
+    var ayer = document.createElement('button');
+    ayer.type = 'button'; ayer.className = 'link'; ayer.textContent = 'Fue ayer';
+    ayer.onclick = function () {
+      if (confirm('¿Anotar que comiste azúcar ayer?')) accionSalud('azucarEvento', { evento: 'recaida', fecha: haceDias(1) }, ayer).catch(function () {});
+    };
+    var deshacer = document.createElement('button');
+    deshacer.type = 'button'; deshacer.className = 'link'; deshacer.textContent = 'Deshacer lo último';
+    deshacer.onclick = function () {
+      if (confirm('¿Deshacer el último registro de azúcar?')) accionSalud('azucarDeshacer', {}, deshacer).catch(function () {});
+    };
+    atajos.append(ayer, deshacer);
+    cont.append(racha, grid, notas, comi, atajos);
+  }
+
+  function pintarProteina() {
+    var d = salud.datos.proteina;
+    var porDia = {};
+    d.registros.forEach(function (x) { porDia[x.fecha] = (porDia[x.fecha] || 0) + x.gramos; });
+    var dia = salud.dia;
+    var total = porDia[dia] || 0;
+    var esHoy = dia === hoy();
+    var nombreDia = esHoy ? 'Hoy' : dia === haceDias(1) ? 'Ayer' : fechaDe(dia).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
+
+    $('prot-meta').textContent = 'Meta: ' + d.meta + ' g · cambiar';
+    $('prot-dia').textContent = nombreDia;
+    $('prot-total').textContent = total + ' g';
+    $('prot-barra').querySelector('i').style.width = Math.min(100, total / d.meta * 100) + '%';
+    $('prot-barra').classList.toggle('lista-meta', total >= d.meta);
+    $('prot-falta').textContent = total >= d.meta ? '✓ Meta cumplida 💪' : 'Faltan ' + (d.meta - total) + ' g para la meta';
+    $('prot-guardar').textContent = esHoy ? 'Agregar' : 'Agregar a ' + nombreDia.toLowerCase();
+
+    // Chips: lo que más come Fran, o una lista base mientras no haya historial.
+    var chips = $('prot-chips');
+    chips.innerHTML = '';
+    var lista = d.frecuentes.length >= 3 ? d.frecuentes : d.frecuentes.concat(ALIMENTOS_BASE.filter(function (b) {
+      return !d.frecuentes.some(function (f) { return f.alimento.toLowerCase() === b.alimento.toLowerCase(); });
+    })).slice(0, 8);
+    lista.forEach(function (a) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.append(a.alimento + ' ');
+      var g = document.createElement('b'); g.textContent = a.gramos + ' g';
+      b.appendChild(g);
+      b.onclick = function () {
+        accionSalud('proteinaAdd', { alimento: a.alimento, gramos: a.gramos, fecha: salud.dia }, b).catch(function () {});
+      };
+      chips.appendChild(b);
+    });
+
+    // Lista del día elegido
+    $('prot-lista-titulo').textContent = nombreDia;
+    var ul = $('prot-lista');
+    ul.innerHTML = '';
+    var delDia = d.registros.filter(function (x) { return x.fecha === dia; });
+    if (!delDia.length) mensajeLista(ul, 'Nada anotado todavía.');
+    delDia.slice().reverse().forEach(function (x) {
+      var li = document.createElement('li');
+      var info = document.createElement('div'); info.className = 'info';
+      var l1 = document.createElement('div'); l1.className = 'linea1';
+      var a = document.createElement('span'); a.textContent = x.alimento;
+      var g = document.createElement('span'); g.textContent = x.gramos + ' g';
+      l1.append(a, g);
+      info.appendChild(l1);
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'borrar'; b.textContent = '✕';
+      b.setAttribute('aria-label', 'Borrar ' + x.alimento);
+      b.onclick = function () { accionSalud('proteinaDelete', { id: x.id }, b).catch(function () {}); };
+      li.append(info, b);
+      ul.appendChild(li);
+    });
+
+    // Últimos 7 días (tocar una barra cambia el día que se ve y donde se anota)
+    var dias = [];
+    for (var i = 6; i >= 0; i--) dias.push(haceDias(i));
+    var max = Math.max.apply(null, dias.map(function (x) { return porDia[x] || 0; }).concat([d.meta * 1.15]));
+    var barras = $('prot-barras'), eje = $('prot-eje');
+    barras.innerHTML = ''; eje.innerHTML = '';
+    var cumplidos = 0;
+    dias.forEach(function (x) {
+      var v = porDia[x] || 0;
+      if (v >= d.meta) cumplidos++;
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = x === dia ? 'sel' : '';
+      b.setAttribute('aria-label', fechaCorta(x) + ': ' + v + ' g');
+      var barra = document.createElement('i');
+      barra.style.height = (v / max * 100) + '%';
+      if (v >= d.meta) barra.className = 'cumple';
+      b.appendChild(barra);
+      b.onclick = function () { salud.dia = x; pintarProteina(); };
+      barras.appendChild(b);
+      var et = document.createElement('span');
+      et.className = x === dia ? 'sel' : '';
+      et.textContent = x === hoy() ? 'hoy' : fechaDe(x).toLocaleDateString('es-CL', { weekday: 'short' }).replace('.', '');
+      eje.appendChild(et);
+    });
+    $('prot-linea').style.bottom = (d.meta / max * 180) + 'px';
+    var semana = dias.reduce(function (a, x) { return a + (porDia[x] || 0); }, 0);
+    $('prot-semana').textContent = 'Meta cumplida ' + cumplidos + ' de 7 días · promedio ' + Math.round(semana / 7) + ' g/día';
+  }
+
+  $('prot-gramos').addEventListener('input', function () {
+    var n = soloNumero(this);
+    this.value = n ? String(n) : '';
+  });
+
+  $('form-prot').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var gramos = soloNumero($('prot-gramos'));
+    var alimento = $('prot-alimento').value.trim();
+    if (!alimento) return mensaje($('prot-msg'), 'Escribe qué comiste', 'err');
+    if (!gramos) return mensaje($('prot-msg'), 'Ingresa los gramos de proteína', 'err');
+    accionSalud('proteinaAdd', { alimento: alimento, gramos: gramos, fecha: salud.dia }, $('prot-guardar')).then(function () {
+      $('prot-alimento').value = '';
+      $('prot-gramos').value = '';
+    }).catch(function () {});
+  });
+
+  $('prot-meta').addEventListener('click', function () {
+    var actual = salud.datos ? salud.datos.proteina.meta : 100;
+    var nueva = Number((prompt('Meta diaria de proteína (gramos):', actual) || '').replace(/\D/g, ''));
+    if (nueva) accionSalud('proteinaMeta', { meta: nueva }, this).catch(function () {});
+  });
 
   // ---------- Datos para los gráficos ----------
   // filas: [{ mes: 'yyyy-MM', centro, persona, total }] agrupadas por el script.

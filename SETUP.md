@@ -76,6 +76,22 @@ El PIN vive solo ahí, nunca en GitHub.
 - **Métricas:** en la app, las pestañas **Por centro** (gráfico circular por centro de costo, por mes o año) y **Meses** (últimos 12 meses). En la planilla, las hojas **Resumen mensual** y **Resumen anual** las escribe el script cada vez que se guarda o borra un gasto desde la app. Si editas la hoja **Gastos** a mano, en script.google.com elige la función **actualizarResumenes** y presiona **Ejecutar**.
 - **Descargar como Excel:** **Archivo → Descargar → Microsoft Excel (.xlsx)**.
 
+## Pestañas personales (Rendición y Salud)
+
+Además de las pestañas comunes, cada persona ve las suyas según quién eligió al entrar:
+
+- **Vicente → Rendición:** sube la foto del comprobante (o un PDF), el monto y la descripción. La foto queda en la carpeta **Rendiciones - comprobantes** de tu Google Drive, la fila en la hoja **Rendiciones** y se envía un correo automático con la foto adjunta. Cada rendición se puede marcar como *Pagada* cuando te la reembolsen.
+- **Fran → Salud:** contador de días sin azúcar (con récord y calendario de las últimas 5 semanas) y contador de proteína diaria con meta, botones de un toque y gráfico de los últimos 7 días. Los datos quedan en las hojas **Azúcar** y **Proteína**.
+
+Para activarlas (una sola vez):
+
+1. Pega el `Code.gs` nuevo en Apps Script y guarda.
+2. En **Propiedades del script** agrega `CORREO_RENDICION` con el correo al que deben llegar las rendiciones (puedes poner varios separados por coma).
+3. Elige la función **setup** y presiona **Ejecutar**. Google pedirá permisos nuevos (Drive para guardar las fotos y Gmail para enviar el correo): acéptalos igual que la primera vez.
+4. **Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.**
+
+> Qué pestañas ve cada uno se define en `index.html`, en `PESTANAS_DE`. Ojo: es una separación de comodidad, no de seguridad; los dos usan el mismo PIN.
+
 ## Si cambias el script más adelante
 
 Pega el nuevo código y ve a **Implementar → Gestionar implementaciones → ✏️ editar → Versión: Nueva versión → Implementar**. Así la URL se mantiene y no hay que tocar `config.js`.
