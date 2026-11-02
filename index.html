@@ -4,7 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Gastos Familia</title>
-  <meta name="theme-color" content="#0f766e">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f4f6f5" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b0f0e" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Gastos">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -28,20 +30,22 @@
       /* Colores de los centros en los gráficos (paleta validada para daltonismo). */
       --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s-otros: #a3aaa8;
     }
+    :root { color-scheme: light dark; }
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg: #0f1514;
-        --card: #18211f;
-        --text: #e8efed;
-        --muted: #93a39f;
-        --border: #2a3633;
-        --accent: #2bb3a3;
-        --accent-text: #06201c;
-        --accent-soft: #163631;
-        --danger: #f2877d;
+        /* Grises neutros (estilo iOS) en vez del verde barroso de antes. */
+        --bg: #0b0f0e;
+        --card: #161b1a;
+        --text: #f2f5f4;
+        --muted: #9aa5a2;
+        --border: #262d2c;
+        --accent: #3cc6b4;
+        --accent-text: #04201c;
+        --accent-soft: rgba(60, 198, 180, .16);
+        --danger: #ff8a80;
         --ok: #5fd08a;
-        --ok-soft: #12301f;
-        --err-soft: #3a1714;
+        --ok-soft: rgba(95, 208, 138, .14);
+        --err-soft: rgba(255, 138, 128, .14);
         --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s-otros: #5d6966;
       }
     }
@@ -257,6 +261,40 @@
     .barras-cont { position: relative; }
     .linea-meta { position: absolute; left: 0; right: 0; border-top: 2px dashed var(--muted); pointer-events: none; }
     .barras i.cumple { background: var(--ok); }
+    @media (prefers-color-scheme: dark) {
+      .card { box-shadow: inset 0 1px 0 rgba(255,255,255,.03); }
+      input, select, .campo-fecha, .foto-btn { background: #0f1413; border-color: #2b3332; }
+      input::placeholder { color: #66716e; }
+      .tabs { background: color-mix(in srgb, var(--card) 80%, transparent); box-shadow: 0 6px 20px rgba(0,0,0,.45); }
+      .tabs button[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); }
+      .subtabs { background: var(--card); }
+      .seg button[aria-pressed="true"] { background: #262d2c; box-shadow: none; }
+      .chip, .chips button, .atajos button { background: #1d2322; }
+      .leyenda .barra, .progreso { background: #232a29; }
+      .dato { background: #1d2322; }
+      .dona circle[stroke="var(--border)"] { stroke: #232a29; }
+      .btn { box-shadow: 0 6px 18px rgba(60, 198, 180, .18); }
+    }
+
+    /* iPad y pantallas anchas: dos columnas en vez de una tira angosta. */
+    @media (min-width: 760px) {
+      main { max-width: 920px; padding: 24px; }
+      #pag-anotar, #pag-resumen, #pag-meses, #pag-rendicion, #pag-salud {
+        display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start;
+      }
+      #pag-anotar > *, #pag-resumen > *, #pag-meses > *, #pag-rendicion > *, #pag-salud > * { margin: 0; grid-column: 2; }
+      #pag-anotar > :first-child, #pag-resumen > :first-child, #pag-meses > :first-child,
+      #pag-rendicion > :first-child, #pag-salud > :first-child { grid-column: 1; grid-row: 1 / span 6; }
+      #pag-salud { grid-auto-flow: row dense; }
+      #pag-salud > :first-child { grid-row: auto; }
+      #pag-salud > :nth-child(2) { grid-column: 1; }
+      .tabs, .subtabs, .bio-invita { max-width: 560px; margin-left: auto; margin-right: auto; }
+      #login, #bloqueo { max-width: 480px; margin: 0 auto; }
+    }
+    .bio-invita { display: flex; align-items: center; gap: 12px; }
+    .bio-invita .ico { font-size: 28px; }
+    .bio-invita .txt { flex: 1; min-width: 0; font-size: 15px; }
+    .bio-invita .txt b { display: block; }
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -279,11 +317,12 @@
     </div>
   </section>
 
-  <!-- Pantalla de bloqueo con Face ID -->
+  <!-- Pantalla de bloqueo con Face ID / Touch ID -->
   <section id="bloqueo" hidden>
     <header><h1>Gastos Familia</h1></header>
     <div class="card centrado">
-      <button class="btn" id="desbloquear" type="button">Abrir con Face ID</button>
+      <div class="bio-ico" id="bloqueo-ico" style="font-size:48px;margin:8px 0">🔒</div>
+      <button class="btn" id="desbloquear" type="button">Abrir con <span class="bio-nombre">Face ID</span></button>
       <button class="link" id="usar-pin" type="button">Usar PIN</button>
       <div id="bloqueo-msg" class="msg" hidden></div>
     </div>
@@ -309,6 +348,13 @@
       <button type="button" role="tab" data-pag="resumen" aria-selected="false">Por centro</button>
       <button type="button" role="tab" data-pag="meses" aria-selected="false">Meses</button>
     </nav>
+
+    <section class="card bio-invita" id="bio-invita" hidden>
+      <span class="ico">🔐</span>
+      <div class="txt"><b>Entra con <span class="bio-nombre">Face ID</span></b>Sin escribir el PIN cada vez en este <span class="bio-equipo">celular</span>.</div>
+      <button class="btn-sec" id="bio-si" type="button">Activar</button>
+      <button class="link" id="bio-no" type="button" aria-label="Ahora no" style="padding:6px">✕</button>
+    </section>
 
     <div id="pag-anotar">
     <form class="card" id="form-gasto" novalidate>
@@ -350,7 +396,7 @@
 
     <section class="card fila" id="faceid-card" hidden>
       <div>
-        <div>Abrir con Face ID</div>
+        <div>Abrir con <span class="bio-nombre">Face ID</span></div>
         <div class="total" id="faceid-estado"></div>
       </div>
       <button class="btn-sec" id="faceid-toggle" type="button"></button>
@@ -1719,7 +1765,22 @@
     mostrarLogin();
   }
 
-  // ---------- Face ID (passkey local del celular) ----------
+  // ---------- Face ID / Touch ID (passkey local del equipo) ----------
+  // El navegador no dice qué sensor tiene el equipo, así que se deduce del modelo:
+  // iPhone → Face ID, Mac → Touch ID, iPad → depende del modelo, Android → huella.
+  var equipo = (function () {
+    var ua = navigator.userAgent;
+    var ipad = /iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    if (ipad) return { nombre: 'Touch ID / Face ID', equipo: 'iPad', ico: '👆' };
+    if (/iPhone|iPod/.test(ua)) return { nombre: 'Face ID', equipo: 'celular', ico: '🙂' };
+    if (/Macintosh/.test(ua)) return { nombre: 'Touch ID', equipo: 'Mac', ico: '👆' };
+    if (/Android/.test(ua)) return { nombre: 'huella', equipo: 'celular', ico: '👆' };
+    return { nombre: 'huella o Face ID', equipo: 'equipo', ico: '🔒' };
+  })();
+  document.querySelectorAll('.bio-nombre').forEach(function (e) { e.textContent = equipo.nombre; });
+  document.querySelectorAll('.bio-equipo').forEach(function (e) { e.textContent = equipo.equipo; });
+  $('bloqueo-ico').textContent = equipo.ico;
+
   // Es un candado del dispositivo: el PIN sigue guardado en el celular y Face ID
   // solo decide si se muestra la app. No se envía nada biométrico a ningún lado.
   function azar(n) { return crypto.getRandomValues(new Uint8Array(n)); }
@@ -1736,7 +1797,7 @@
   function activarFaceId() {
     return navigator.credentials.create({ publicKey: {
       challenge: azar(32),
-      rp: { name: 'Gastos Familia' },
+      rp: { name: 'Gastos Familia', id: location.hostname || undefined },
       user: { id: azar(16), name: estado.persona || 'Gastos', displayName: estado.persona || 'Gastos' },
       pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
       authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred' },
@@ -1759,19 +1820,30 @@
     faceIdDisponible().then(function (ok) {
       $('faceid-card').hidden = !ok;
       var activo = !!leer('faceid');
-      $('faceid-estado').textContent = activo ? 'Activado en este celular' : 'Desactivado';
+      $('faceid-estado').textContent = activo ? 'Activado en este ' + equipo.equipo : 'Desactivado';
       $('faceid-toggle').textContent = activo ? 'Desactivar' : 'Activar';
+      // Si se puede y no está activo, se ofrece arriba (hasta que diga "no").
+      $('bio-invita').hidden = !ok || activo || leer('bio-no') === '1';
     });
   }
+
+  function activarBio() {
+    activarFaceId().then(function () {
+      pintarFaceId();
+      mensaje($('gasto-msg'), '✓ Listo: la próxima vez entras con ' + equipo.nombre, 'ok');
+    }).catch(function (err) {
+      if (err && err.name !== 'NotAllowedError') alert('No se pudo activar ' + equipo.nombre + ': ' + err.message);
+    });
+  }
+  $('bio-si').addEventListener('click', activarBio);
+  $('bio-no').addEventListener('click', function () { guardar('bio-no', '1'); $('bio-invita').hidden = true; });
 
   $('faceid-toggle').addEventListener('click', function () {
     if (leer('faceid')) {
       guardar('faceid', '');
       return pintarFaceId();
     }
-    activarFaceId().then(pintarFaceId).catch(function (err) {
-      if (err && err.name !== 'NotAllowedError') alert('No se pudo activar Face ID: ' + err.message);
-    });
+    activarBio();
   });
 
   function mostrarBloqueo() {
