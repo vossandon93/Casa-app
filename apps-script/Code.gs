@@ -20,10 +20,17 @@ var HOJA_AZUCAR = 'Azúcar';
 var HOJA_PROTEINA = 'Proteína';
 
 var COLUMNAS_GASTOS = ['ID', 'Fecha', 'Centro de costo', 'Monto', 'Descripción', 'Registró', 'Creado', 'Cuenta'];
-var CENTROS_INICIALES = ['Farmacia', 'Luna', 'Supermercado', 'Fran'];
+var CENTROS_INICIALES = ['Auto', 'Familia', 'Salud', 'Vicky', 'Fran', 'Vicente', 'Casa'];
 var PERSONAS_INICIALES = ['Vicente', 'Fran'];
 // Cuentas que se crean solas si existe un centro con ese nombre (sin importar mayúsculas).
-var CUENTAS_INICIALES = { 'Vicky': ['Sueldo', 'Contribuciones', 'Traslado'], 'Nana': ['Sueldo', 'Contribuciones', 'Traslado'] };
+var CUENTAS_INICIALES = {
+  'Auto': ['Seguro', 'Bencina', 'TAG'],
+  'Familia': ['Regalos', 'Eventos / Salidas', 'Supermercado', 'Luna'],
+  'Salud': ['Isapre', 'Farmacia'],
+  'Vicky': ['Sueldo', 'Traslado', 'Imposiciones']
+};
+// Cuentas que cambiaron de nombre: { centro: { 'nombre viejo': 'nombre nuevo' } }.
+var CUENTAS_RENOMBRADAS = { 'Vicky': { 'Contribuciones': 'Imposiciones' } };
 var ULTIMOS_GASTOS = 20;
 var COLUMNAS_RENDICIONES = ['ID', 'Fecha', 'Monto', 'Descripción', 'Comprobante', 'Estado', 'Correo', 'Registró', 'Creado'];
 var COLUMNAS_AZUCAR = ['Fecha', 'Evento', 'Creado'];
@@ -137,6 +144,98 @@ function prepararHoja_(ss, nombre, columnas) {
 
 function hoja_(nombre, columnas) {
   return prepararHoja_(libro_(), nombre, columnas);
+}
+
+// ---------------------------------------------------------------------------
+// Ordenar centros y cuentas: ejecutar UNA vez desde el editor (reordenarCentrosYCuentas).
+//
+// 1. Deja las hojas Centros y Cuentas igual a CENTROS_INICIALES / CUENTAS_INICIALES.
+// 2. Mueve los gastos antiguos cuyo centro ahora es una cuenta (Luna, Supermercado,
+//    Farmacia…) a su centro nuevo, con esa cuenta. Se cambia la MISMA fila: no se
+//    copia nada, así que ningún gasto queda en dos centros ni se suma doble.
+// 3. Renombra cuentas (Vicky / Contribuciones → Imposiciones).
+// 4. Antes de tocar nada guarda una copia de la hoja Gastos ("Gastos respaldo …").
+// Se puede ejecutar de nuevo sin problema: lo que ya está ordenado no cambia.
+// ---------------------------------------------------------------------------
+function reordenarCentrosYCuentas() {
+  var ss = libro_();
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var gastos = hojaGastos_();
+    asegurarColumnaCuenta_(gastos);
+    var tz = ss.getSpreadsheetTimeZone();
+    var respaldo = gastos.copyTo(ss).setName('Gastos respaldo ' + Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd HH.mm'));
+    respaldo.hideSheet();
+
+    // Centros
+    var hojaCentros = obtenerOCrearHoja_(ss, HOJA_CENTROS);
+    hojaCentros.clearContents();
+    hojaCentros.getRange(1, 1, CENTROS_INICIALES.length + 1, 1)
+      .setValues([['Centro de costo']].concat(CENTROS_INICIALES.map(function (c) { return [c]; })));
+    hojaCentros.getRange(1, 1).setFontWeight('bold');
+
+    // Cuentas
+    var filasCuentas = [['Centro de costo', 'Cuenta']];
+    Object.keys(CUENTAS_INICIALES).forEach(function (centro) {
+      CUENTAS_INICIALES[centro].forEach(function (c) { filasCuentas.push([centro, c]); });
+    });
+    var hojaCuentas = obtenerOCrearHoja_(ss, HOJA_CUENTAS);
+    hojaCuentas.clearContents();
+    hojaCuentas.getRange(1, 1, filasCuentas.length, 2).setValues(filasCuentas);
+    hojaCuentas.getRange(1, 1, 1, 2).setFontWeight('bold');
+
+    // Cada cuenta → su centro (sin mayúsculas), para mover los centros antiguos.
+    var centroDeCuenta = {};
+    Object.keys(CUENTAS_INICIALES).forEach(function (centro) {
+      CUENTAS_INICIALES[centro].forEach(function (c) { centroDeCuenta[c.toLowerCase()] = { centro: centro, cuenta: c }; });
+    });
+    var centroOficial = {};
+    CENTROS_INICIALES.forEach(function (c) { centroOficial[c.toLowerCase()] = c; });
+
+    var cambios = {}, sinCentro = {}, n = gastos.getLastRow() - 1;
+    if (n > 0) {
+      var rango = gastos.getRange(2, 1, n, COLUMNAS_GASTOS.length);
+      var filas = rango.getValues();
+      filas.forEach(function (f) {
+        if (!f[0] && !f[3]) return;
+        var centro = String(f[2]).trim(), cuenta = String(f[7] || '').trim();
+        var antes = centro + (cuenta ? ' / ' + cuenta : '');
+        var nuevo = centroOficial[centro.toLowerCase()];
+        if (nuevo) {
+          centro = nuevo;
+        } else if (centroDeCuenta[centro.toLowerCase()]) {
+          var destino = centroDeCuenta[centro.toLowerCase()];
+          centro = destino.centro;
+          cuenta = cuenta || destino.cuenta;
+        } else {
+          sinCentro[centro] = (sinCentro[centro] || 0) + 1;
+        }
+        var ren = CUENTAS_RENOMBRADAS[centro] || {};
+        Object.keys(ren).forEach(function (viejo) { if (cuenta.toLowerCase() === viejo.toLowerCase()) cuenta = ren[viejo]; });
+        var despues = centro + (cuenta ? ' / ' + cuenta : '');
+        if (despues !== antes) {
+          f[2] = centro;
+          f[7] = cuenta;
+          var k = antes + '  →  ' + despues;
+          cambios[k] = (cambios[k] || 0) + 1;
+        }
+      });
+      rango.setValues(filas);
+    }
+    actualizarResumenes_(ss);
+
+    var lineas = ['Respaldo guardado en la hoja oculta "' + respaldo.getName() + '".'];
+    var claves = Object.keys(cambios);
+    lineas.push(claves.length ? 'Gastos movidos:' : 'No había gastos que mover.');
+    claves.forEach(function (k) { lineas.push('  ' + k + '  (' + cambios[k] + ')'); });
+    Object.keys(sinCentro).forEach(function (c) {
+      lineas.push('OJO: ' + sinCentro[c] + ' gasto(s) con centro "' + c + '" no calzan con ningún centro ni cuenta: quedaron igual.');
+    });
+    Logger.log(lineas.join('\n'));
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // Los resúmenes se escriben como valores calculados por el script (sin fórmulas
