@@ -27,7 +27,8 @@ var CUENTAS_INICIALES = {
   'Auto': ['Seguro', 'Bencina', 'TAG'],
   'Familia': ['Regalos', 'Eventos / Salidas', 'Supermercado', 'Luna'],
   'Salud': ['Isapre', 'Farmacia'],
-  'Vicky': ['Sueldo', 'Traslado', 'Imposiciones']
+  'Vicky': ['Sueldo', 'Traslado', 'Imposiciones'],
+  'Casa': ['Fumigación', 'Conectividad', 'Gas', 'Agua', 'Tintorería']
 };
 // Cuentas que cambiaron de nombre: { centro: { 'nombre viejo': 'nombre nuevo' } }.
 var CUENTAS_RENOMBRADAS = { 'Vicky': { 'Contribuciones': 'Imposiciones' } };
@@ -41,7 +42,7 @@ var CARPETA_RENDICIONES = 'Rendiciones - comprobantes';
 var META_PROTEINA_INICIAL = 100;
 var ULTIMAS_RENDICIONES = 50;
 // Se muestra al abrir la URL /exec: sirve para comprobar que Google tiene el código nuevo.
-var VERSION = '2026-11-03 · centros nuevos en orden alfabético';
+var VERSION = '2026-11-03 · cuentas de Casa';
 
 // ---------------------------------------------------------------------------
 // Instalación: ejecutar una vez desde el editor (botón "Ejecutar" con setup).
@@ -464,6 +465,7 @@ function agregarCentro_(nombre) {
 
 function config_() {
   reordenarSiFalta_();
+  agregarCuentasFaltantes_();
   var cuentas = leerCuentas_();
   Object.keys(cuentas).forEach(function (c) { cuentas[c] = alfabetico_(cuentas[c]); });
   return { ok: true, centros: alfabetico_(leerLista_(HOJA_CENTROS)), personas: leerLista_(HOJA_PERSONAS), cuentas: cuentas };
@@ -485,6 +487,40 @@ function ordenarHoja_(nombreHoja, columnas) {
 
 // La primera vez que la app abre con este código, ordena centros y cuentas sola
 // (no hace falta ejecutar reordenarCentrosYCuentas a mano). Solo corre una vez.
+// Cuentas nuevas de la lista oficial que aún no están en la hoja Cuentas: se agregan
+// solas (sin borrar las que ya hay ni tocar gastos). Cambiar CUENTAS_VERSION al
+// agregar cuentas a CUENTAS_INICIALES para que corra de nuevo.
+var CUENTAS_VERSION = '2026-11-03 casa';
+function agregarCuentasFaltantes_() {
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty('CUENTAS_VERSION') === CUENTAS_VERSION) return;
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var ss = libro_();
+    var hoja = obtenerOCrearHoja_(ss, HOJA_CUENTAS);
+    if (hoja.getLastRow() === 0) hoja.appendRow(['Centro de costo', 'Cuenta']);
+    var centros = leerLista_(HOJA_CENTROS, ss);
+    var actuales = leerCuentas_(ss);
+    var nuevas = [];
+    Object.keys(CUENTAS_INICIALES).forEach(function (k) {
+      var centro = centros.filter(function (c) { return c.toLowerCase() === k.toLowerCase(); })[0];
+      if (!centro) return;
+      var ya = (actuales[centro] || []).map(function (c) { return c.toLowerCase(); });
+      CUENTAS_INICIALES[k].forEach(function (c) {
+        if (ya.indexOf(c.toLowerCase()) === -1) nuevas.push([centro, c]);
+      });
+    });
+    if (nuevas.length) {
+      hoja.getRange(hoja.getLastRow() + 1, 1, nuevas.length, 2).setValues(nuevas);
+      ordenarHoja_(HOJA_CUENTAS, 2);
+    }
+    props.setProperty('CUENTAS_VERSION', CUENTAS_VERSION);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 var ORDEN_CENTROS_VERSION = '2026-11-03';
 function reordenarSiFalta_() {
   var props = PropertiesService.getScriptProperties();
