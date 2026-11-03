@@ -41,7 +41,7 @@ var CARPETA_RENDICIONES = 'Rendiciones - comprobantes';
 var META_PROTEINA_INICIAL = 100;
 var ULTIMAS_RENDICIONES = 50;
 // Se muestra al abrir la URL /exec: sirve para comprobar que Google tiene el código nuevo.
-var VERSION = '2026-11-02 · cuentas + rendiciones y salud';
+var VERSION = '2026-11-03 · centros nuevos en orden alfabético';
 
 // ---------------------------------------------------------------------------
 // Instalación: ejecutar una vez desde el editor (botón "Ejecutar" con setup).
@@ -174,13 +174,13 @@ function reordenarCentrosYCuentas() {
     var hojaCentros = obtenerOCrearHoja_(ss, HOJA_CENTROS);
     hojaCentros.clearContents();
     hojaCentros.getRange(1, 1, CENTROS_INICIALES.length + 1, 1)
-      .setValues([['Centro de costo']].concat(CENTROS_INICIALES.map(function (c) { return [c]; })));
+      .setValues([['Centro de costo']].concat(alfabetico_(CENTROS_INICIALES).map(function (c) { return [c]; })));
     hojaCentros.getRange(1, 1).setFontWeight('bold');
 
     // Cuentas
     var filasCuentas = [['Centro de costo', 'Cuenta']];
-    Object.keys(CUENTAS_INICIALES).forEach(function (centro) {
-      CUENTAS_INICIALES[centro].forEach(function (c) { filasCuentas.push([centro, c]); });
+    alfabetico_(Object.keys(CUENTAS_INICIALES)).forEach(function (centro) {
+      alfabetico_(CUENTAS_INICIALES[centro]).forEach(function (c) { filasCuentas.push([centro, c]); });
     });
     var hojaCuentas = obtenerOCrearHoja_(ss, HOJA_CUENTAS);
     hojaCuentas.clearContents();
@@ -238,6 +238,7 @@ function reordenarCentrosYCuentas() {
       lineas.push('OJO: ' + sinCentro[c] + ' gasto(s) con centro "' + c + '" no calzan con ningún centro ni cuenta: quedaron igual.');
     });
     Logger.log(lineas.join('\n'));
+    PropertiesService.getScriptProperties().setProperty('ORDEN_CENTROS', ORDEN_CENTROS_VERSION);
   } finally {
     lock.releaseLock();
   }
@@ -454,6 +455,7 @@ function agregarCentro_(nombre) {
     var existentes = leerLista_(HOJA_CENTROS);
     var repetido = existentes.some(function (c) { return c.toLowerCase() === nombre.toLowerCase(); });
     if (!repetido) libro_().getSheetByName(HOJA_CENTROS).appendRow([nombre]);
+    ordenarHoja_(HOJA_CENTROS, 1);
   } finally {
     lock.releaseLock();
   }
@@ -461,7 +463,33 @@ function agregarCentro_(nombre) {
 }
 
 function config_() {
-  return { ok: true, centros: leerLista_(HOJA_CENTROS), personas: leerLista_(HOJA_PERSONAS), cuentas: leerCuentas_() };
+  reordenarSiFalta_();
+  var cuentas = leerCuentas_();
+  Object.keys(cuentas).forEach(function (c) { cuentas[c] = alfabetico_(cuentas[c]); });
+  return { ok: true, centros: alfabetico_(leerLista_(HOJA_CENTROS)), personas: leerLista_(HOJA_PERSONAS), cuentas: cuentas };
+}
+
+// Centros y cuentas siempre en orden alfabético (sin importar mayúsculas ni tildes).
+function alfabetico_(lista) {
+  return lista.slice().sort(function (a, b) { return String(a).localeCompare(String(b), 'es', { sensitivity: 'base' }); });
+}
+
+// Deja la hoja ordenada A→Z (Centros por nombre; Cuentas por centro y luego cuenta).
+function ordenarHoja_(nombreHoja, columnas) {
+  var hoja = libro_().getSheetByName(nombreHoja);
+  if (!hoja || hoja.getLastRow() < 3) return;
+  var orden = [];
+  for (var i = 1; i <= columnas; i++) orden.push({ column: i, ascending: true });
+  hoja.getRange(2, 1, hoja.getLastRow() - 1, columnas).sort(orden);
+}
+
+// La primera vez que la app abre con este código, ordena centros y cuentas sola
+// (no hace falta ejecutar reordenarCentrosYCuentas a mano). Solo corre una vez.
+var ORDEN_CENTROS_VERSION = '2026-11-03';
+function reordenarSiFalta_() {
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty('ORDEN_CENTROS') === ORDEN_CENTROS_VERSION) return;
+  reordenarCentrosYCuentas();
 }
 
 // { 'Vicky': ['Sueldo', 'Contribuciones', 'Traslado'], ... } con los centros tal como están en la hoja Centros.
@@ -502,6 +530,7 @@ function agregarCuenta_(centro, nombre) {
     var actuales = leerCuentas_(ss)[centro] || [];
     var repetida = actuales.some(function (c) { return c.toLowerCase() === nombre.toLowerCase(); });
     if (!repetida) hoja.appendRow([centro, nombre]);
+    ordenarHoja_(HOJA_CUENTAS, 2);
   } finally {
     lock.releaseLock();
   }
