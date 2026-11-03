@@ -45,7 +45,7 @@ var CARPETA_RENDICIONES = 'Rendiciones - comprobantes';
 var META_PROTEINA_INICIAL = 100;
 var ULTIMAS_RENDICIONES = 50;
 // Se muestra al abrir la URL /exec: sirve para comprobar que Google tiene el código nuevo.
-var VERSION = '2026-11-03 · listas desplegables y resúmenes automáticos';
+var VERSION = '2026-11-03 · botón Revisar planilla';
 
 // ---------------------------------------------------------------------------
 // Instalación: ejecutar una vez desde el editor (botón "Ejecutar" con setup).
@@ -542,6 +542,14 @@ function listasGastosSiFalta_() {
 
 // Ejecutar desde el editor: muestra en el registro las filas que no cuadran.
 function revisarGastos() {
+  var problemas = problemasGastos_().map(function (p) {
+    return 'Fila ' + p.fila + ': ' + p.motivos.join('; ') + (p.descripcion ? '  (' + p.descripcion + ')' : '');
+  });
+  Logger.log(problemas.length ? problemas.length + ' fila(s) para revisar:\n' + problemas.join('\n') : 'Todo bien: no hay filas con problemas.');
+}
+
+// Lo mismo, como datos para el botón "Revisar planilla" de la app.
+function problemasGastos_() {
   var ss = libro_();
   var hoja = hojaGastos_();
   var centros = leerLista_(HOJA_CENTROS, ss);
@@ -555,9 +563,20 @@ function revisarGastos() {
     else if (cuenta && (cuentas[centro] || []).indexOf(cuenta) === -1) motivos.push('cuenta "' + cuenta + '" no es de ' + centro);
     if (!(f[1] instanceof Date)) motivos.push('fecha "' + f[1] + '" no es una fecha');
     if (typeof f[3] !== 'number' || !(f[3] > 0)) motivos.push('monto "' + f[3] + '" no es un número');
-    if (motivos.length) problemas.push('Fila ' + fila + ': ' + motivos.join('; ') + (f[4] ? '  (' + f[4] + ')' : ''));
+    if (motivos.length) {
+      problemas.push({
+        fila: fila,
+        motivos: motivos,
+        descripcion: String(f[4] || ''),
+        centro: centro,
+        cuenta: cuenta,
+        monto: typeof f[3] === 'number' ? f[3] : 0,
+        fecha: f[1] instanceof Date ? Utilities.formatDate(f[1], ss.getSpreadsheetTimeZone(), 'yyyy-MM-dd') : '',
+        persona: String(f[5] || '')
+      });
+    }
   });
-  Logger.log(problemas.length ? problemas.length + ' fila(s) para revisar:\n' + problemas.join('\n') : 'Todo bien: no hay filas con problemas.');
+  return problemas;
 }
 
 // ---------------------------------------------------------------------------
@@ -594,6 +613,8 @@ function doPost(e) {
         borrarGasto_(body.id);
         actualizarResumenes_(libro_());
         return json_({ ok: true, gastos: ultimosGastos_(), totalMes: totalMesActual_() });
+      case 'revisar':
+        return json_({ ok: true, problemas: problemasGastos_(), url: libro_().getUrl() });
       case 'resumen':
         return json_({ ok: true, filas: totalesPorMes_() });
       case 'detalle':
