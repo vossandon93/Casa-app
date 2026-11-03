@@ -42,7 +42,7 @@ var CARPETA_RENDICIONES = 'Rendiciones - comprobantes';
 var META_PROTEINA_INICIAL = 100;
 var ULTIMAS_RENDICIONES = 50;
 // Se muestra al abrir la URL /exec: sirve para comprobar que Google tiene el código nuevo.
-var VERSION = '2026-11-03 · cuentas de Casa + gastos antiguos';
+var VERSION = '2026-11-03 · acceso con Google + límite de intentos';
 
 // ---------------------------------------------------------------------------
 // Instalación: ejecutar una vez desde el editor (botón "Ejecutar" con setup).
@@ -368,7 +368,9 @@ function doGet() {
 function doPost(e) {
   try {
     var body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
-    validarPin_(body.pin);
+    if (body.action === 'modo') return json_(modoAcceso_());
+    if (body.action === 'loginGoogle') return json_(loginGoogle_(body));
+    autorizar_(body);
 
     switch (body.action) {
       case 'config':
@@ -433,10 +435,128 @@ function doPost(e) {
   }
 }
 
-function validarPin_(pin) {
-  var esperado = PropertiesService.getScriptProperties().getProperty('PIN');
+// ---------------------------------------------------------------------------
+// Acceso
+// - Con las propiedades GOOGLE_CLIENT_ID y CORREOS_PERMITIDOS: solo entran esos
+//   correos, con su cuenta de Google. El PIN deja de servir.
+// - Sin ellas: PIN (como antes).
+// En ambos casos, 5 intentos fallidos seguidos bloquean el ingreso por 15 minutos.
+// Tras entrar con Google el equipo recibe una sesión (válida 1 año) que se puede
+// revocar con cerrarTodasLasSesiones.
+// ---------------------------------------------------------------------------
+var MAX_FALLOS = 5;
+var BLOQUEO_SEGUNDOS = 15 * 60;
+var DURACION_SESION_DIAS = 365;
+
+function propiedad_(k) { return PropertiesService.getScriptProperties().getProperty(k) || ''; }
+
+function correosPermitidos_() {
+  return propiedad_('CORREOS_PERMITIDOS').split(/[\s,;]+/)
+    .map(function (c) { return c.trim().toLowerCase(); })
+    .filter(function (c) { return c; });
+}
+
+function modoGoogle_() { return !!(propiedad_('GOOGLE_CLIENT_ID') && correosPermitidos_().length); }
+
+function modoAcceso_() {
+  return { ok: true, google: modoGoogle_(), clientId: modoGoogle_() ? propiedad_('GOOGLE_CLIENT_ID') : '' };
+}
+
+function revisarBloqueo_() {
+  var n = Number(CacheService.getScriptCache().get('fallos') || 0);
+  if (n >= MAX_FALLOS) throw new Error('Demasiados intentos fallidos. Espera 15 minutos e intenta de nuevo.');
+}
+
+function sumarFallo_() {
+  var cache = CacheService.getScriptCache();
+  cache.put('fallos', String(Number(cache.get('fallos') || 0) + 1), BLOQUEO_SEGUNDOS);
+}
+
+function claveSesion_(token) {
+  var hash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(token));
+  return 'SES_' + Utilities.base64EncodeWebSafe(hash).replace(/=+$/, '');
+}
+
+function autorizar_(body) {
+  if (modoGoogle_()) {
+    var token = String(body.sesion || '');
+    var guardada = token ? propiedad_(claveSesion_(token)) : '';
+    var s = null;
+    try { s = guardada ? JSON.parse(guardada) : null; } catch (e) {}
+    var vencida = s && (Date.now() - s.creado) > DURACION_SESION_DIAS * 864e5;
+    // Si sacaste un correo de la lista, sus sesiones dejan de servir al tiro.
+    if (!s || vencida || correosPermitidos_().indexOf(s.email) === -1) {
+      if (s) PropertiesService.getScriptProperties().deleteProperty(claveSesion_(token));
+      throw new Error('Sesión no válida: entra con tu cuenta de Google');
+    }
+    return s.email;
+  }
+  revisarBloqueo_();
+  var esperado = propiedad_('PIN');
   if (!esperado) throw new Error('El PIN no está configurado en el script');
-  if (String(pin || '') !== String(esperado)) throw new Error('PIN incorrecto');
+  if (String(body.pin || '') !== String(esperado)) {
+    sumarFallo_();
+    throw new Error('PIN incorrecto');
+  }
+  return '';
+}
+
+// Recibe el id_token que Google entregó a la página y lo verifica con Google.
+function loginGoogle_(body) {
+  if (!modoGoogle_()) throw new Error('El ingreso con Google no está activado');
+  revisarBloqueo_();
+  var idToken = String(body.idToken || '');
+  var nonce = String(body.nonce || '');
+  if (!idToken || !nonce) throw new Error('Faltan datos de Google');
+  var r = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken), { muteHttpExceptions: true });
+  if (r.getResponseCode() !== 200) throw new Error('Google no validó el ingreso. Intenta de nuevo.');
+  var t = JSON.parse(r.getContentText());
+  var valido = t.aud === propiedad_('GOOGLE_CLIENT_ID') &&
+    (t.iss === 'accounts.google.com' || t.iss === 'https://accounts.google.com') &&
+    String(t.email_verified) === 'true' &&
+    Number(t.exp) * 1000 > Date.now() &&
+    t.nonce === nonce;
+  if (!valido) throw new Error('Google no validó el ingreso. Intenta de nuevo.');
+  var email = String(t.email || '').toLowerCase();
+  if (correosPermitidos_().indexOf(email) === -1) {
+    sumarFallo_();
+    throw new Error('La cuenta ' + email + ' no tiene acceso a esta app.');
+  }
+  var token = Utilities.getUuid().replace(/-/g, '');
+  PropertiesService.getScriptProperties().setProperty(claveSesion_(token), JSON.stringify({ email: email, creado: Date.now() }));
+  return { ok: true, sesion: token, email: email };
+}
+
+// Ejecutar UNA vez desde el editor después de poner GOOGLE_CLIENT_ID y
+// CORREOS_PERMITIDOS: pide el permiso para hablar con Google y revisa la configuración.
+function activarAccesoGoogle() {
+  UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=x', { muteHttpExceptions: true });
+  var lineas = [];
+  lineas.push(propiedad_('GOOGLE_CLIENT_ID') ? '✓ GOOGLE_CLIENT_ID configurado.' : '✗ Falta la propiedad GOOGLE_CLIENT_ID.');
+  var correos = correosPermitidos_();
+  lineas.push(correos.length ? '✓ Correos con acceso: ' + correos.join(', ') : '✗ Falta la propiedad CORREOS_PERMITIDOS.');
+  lineas.push(modoGoogle_() ? 'Listo: desde ahora solo se entra con esas cuentas de Google (publica una nueva versión).' : 'Todavía se entra con PIN.');
+  Logger.log(lineas.join('\n'));
+}
+
+// Cierra la sesión en todos los equipos (todos deberán volver a entrar con Google).
+function cerrarTodasLasSesiones() {
+  var props = PropertiesService.getScriptProperties();
+  var n = 0;
+  Object.keys(props.getProperties()).forEach(function (k) {
+    if (k.indexOf('SES_') === 0) { props.deleteProperty(k); n++; }
+  });
+  Logger.log('Sesiones cerradas: ' + n);
+}
+
+// Muestra qué cuentas tienen sesiones abiertas y desde cuándo.
+function verSesiones() {
+  var props = PropertiesService.getScriptProperties().getProperties();
+  var lineas = Object.keys(props).filter(function (k) { return k.indexOf('SES_') === 0; }).map(function (k) {
+    var s = JSON.parse(props[k]);
+    return s.email + ' · desde ' + new Date(s.creado).toLocaleString();
+  });
+  Logger.log(lineas.length ? lineas.join('\n') : 'No hay sesiones abiertas.');
 }
 
 function leerLista_(nombreHoja, ss) {
