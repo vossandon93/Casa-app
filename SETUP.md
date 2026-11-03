@@ -43,7 +43,7 @@ El PIN vive solo ahí, nunca en GitHub.
 3. Ejecutar como: **Yo**. Quién tiene acceso: **Cualquier usuario**.
 4. **Implementar** y copia la **URL de la aplicación web** (termina en `/exec`).
 
-"Cualquier usuario" es necesario para que la app pueda conectarse sin pedir login de Google; el PIN es lo que protege la escritura.
+"Cualquier usuario" es necesario para que la app pueda conectarse; el acceso lo controla el propio script (PIN con límite de intentos, o cuentas de Google autorizadas: ver "Acceso privado").
 
 ## 6. Pegar la URL en la app
 
@@ -83,6 +83,32 @@ La lista oficial está en `apps-script/Code.gs` (`CENTROS_INICIALES` y `CUENTAS_
 Cuando se agregan cuentas a la lista oficial (ej. Casa: Agua, Conectividad, Fumigación, Gas, Tintorería), la app las suma sola y también mueve los gastos antiguos a su cuenta: centros viejos con ese nombre o un sinónimo (Internet/Entel → Conectividad) y gastos de Casa sin cuenta cuya descripción lo deja claro (Metrogas → Gas). Si calza con más de una cuenta no se toca. Se cambia la misma fila (sin duplicar), con respaldo oculto, y se puede repetir a mano con **moverGastosAntiguos**.
 
 Los centros y las cuentas siempre se muestran en orden alfabético, también los que se agreguen después desde la app (las hojas Centros y Cuentas se reordenan solas).
+
+## Acceso privado: solo con cuentas de Google autorizadas
+
+Sin esto la app se protege solo con el PIN (con límite: 5 intentos fallidos bloquean el ingreso 15 minutos). Con esto, **solo entran los correos que tú elijas**, con su cuenta de Google, y el PIN deja de servir. Los correos quedan en las propiedades del script, no en GitHub.
+
+**A. Crear el ID de cliente de Google (una vez, ~5 min)**
+1. Entra a https://console.cloud.google.com/ con tu cuenta y crea un proyecto (ej. "Gastos Familia").
+2. Menú → **APIs y servicios → Pantalla de consentimiento de OAuth** (o **Google Auth Platform**) → **Comenzar**: nombre "Gastos Familia", tu correo de soporte, público **Externo**, acepta y crea.
+3. En **Público / Audiencia → Usuarios de prueba** agrega los 2 correos que tendrán acceso (deja la app en modo *Prueba*: es otra capa de protección).
+4. **Clientes → Crear cliente** → tipo **Aplicación web**:
+   - Orígenes autorizados de JavaScript: `https://vossandon93.github.io`
+   - URI de redireccionamiento autorizados: `https://vossandon93.github.io/Finanzas/` (con la barra final)
+5. Copia el **ID de cliente** (termina en `.apps.googleusercontent.com`). No es secreto.
+
+**B. Activarlo en Apps Script**
+1. **Configuración del proyecto (⚙️) → Propiedades del script** → agrega:
+   - `GOOGLE_CLIENT_ID` = el ID de cliente.
+   - `CORREOS_PERMITIDOS` = los correos separados por coma, ej. `persona1@gmail.com, persona2@gmail.com`.
+2. En el editor elige **activarAccesoGoogle** → **Ejecutar** → acepta el permiso nuevo ("conectarse a un servicio externo"). El registro debe decir "Listo".
+3. **Implementar → Gestionar implementaciones → ✏️ → Nueva versión**.
+4. Abre la app: aparece **Entrar con Google**. Después vuelve a activar Touch ID / Face ID en cada equipo.
+
+**Para administrar**
+- Quitar a alguien: bórralo de `CORREOS_PERMITIDOS` (sus sesiones dejan de servir al tiro).
+- **verSesiones**: muestra qué cuentas tienen sesión abierta. **cerrarTodasLasSesiones**: obliga a todos a entrar de nuevo con Google (úsalo si pierdes un equipo).
+- Para volver al PIN, borra `CORREOS_PERMITIDOS`.
 
 ## Pestañas personales (Rendición y Salud)
 

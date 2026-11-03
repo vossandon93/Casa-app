@@ -306,6 +306,8 @@
     .seg-tema { display: flex; background: var(--bg); border-radius: 999px; padding: 3px; }
     .seg-tema button { border: 0; background: none; color: var(--muted); font: inherit; font-size: 14px; font-weight: 600; padding: 7px 12px; border-radius: 999px; cursor: pointer; }
     .seg-tema button[aria-pressed="true"] { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+    .btn-google { margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 10px; background: #fff; color: #1f1f1f; border: 1px solid #dadce0; }
+    [data-tema="oscuro"] .btn-google { background: #fff; color: #1f1f1f; border-color: transparent; }
     .bio-login { margin-top: 10px; background: none; border: 1px solid var(--accent); color: var(--accent); }
 
     /* iPad y pantallas anchas: dos columnas en vez de una tira angosta. */
@@ -337,9 +339,15 @@
     <header><h1>Gastos Familia</h1></header>
     <div class="card">
       <form id="form-pin">
-        <label for="pin">PIN</label>
-        <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" required>
-        <button class="btn" type="submit">Entrar</button>
+        <div id="pin-campos">
+          <label for="pin">PIN</label>
+          <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+          <button class="btn" type="submit">Entrar</button>
+        </div>
+        <button class="btn btn-google" id="login-google" type="button" hidden>
+          <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+          Entrar con Google
+        </button>
         <button class="btn bio-login" id="login-bio" type="button" hidden>Entrar con <span class="bio-nombre">Face ID</span></button>
       </form>
       <div id="elegir-persona" hidden>
@@ -573,7 +581,7 @@
   var API = window.GASTOS_API_URL;
   var $ = function (id) { return document.getElementById(id); };
   var clp = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
-  var estado = { pin: leer('pin'), persona: leer('persona'), centros: [], personas: [], cuentas: {}, cuenta: '', fecha: '', filas: null, detalles: {} };
+  var estado = { pin: leer('pin'), sesion: leer('sesion'), persona: leer('persona'), centros: [], personas: [], cuentas: {}, cuenta: '', fecha: '', filas: null, detalles: {} };
 
   function leer(k) { try { return localStorage.getItem('gastos.' + k) || ''; } catch (e) { return ''; } }
   function guardar(k, v) { try { v ? localStorage.setItem('gastos.' + k, v) : localStorage.removeItem('gastos.' + k); } catch (e) {} }
@@ -600,7 +608,7 @@
     if (!API || API.indexOf('PEGAR_AQUI') === 0) {
       return Promise.reject(new Error('Falta configurar la URL de Apps Script en config.js'));
     }
-    var body = Object.assign({ action: action, pin: estado.pin }, datos || {});
+    var body = Object.assign({ action: action, pin: estado.pin, sesion: estado.sesion }, datos || {});
     // text/plain evita el preflight CORS que Apps Script no responde.
     return fetch(API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) })
       .then(function (r) { return r.json(); })
@@ -621,6 +629,66 @@
     $('elegir-persona').hidden = true;
     $('login-msg').hidden = true;
     $('pin').value = '';
+    pintarModo(leer('modo') === 'google');
+    // Se pregunta al servidor si se entra con Google o con PIN (lo decide Apps Script).
+    api('modo').then(function (res) {
+      guardar('modo', res.google ? 'google' : 'pin');
+      guardar('clientId', res.clientId || '');
+      pintarModo(res.google);
+    }).catch(function () {});
+  }
+
+  function pintarModo(google) {
+    $('pin-campos').hidden = google;
+    $('login-google').hidden = !google;
+    $('usar-pin').textContent = google ? 'Entrar con Google' : 'Usar PIN';
+  }
+
+  // ---------- Entrar con Google ----------
+  // Se va a la página de Google y vuelve con un id_token en la dirección (#id_token=…).
+  // Funciona igual en la app instalada en la pantalla de inicio (sin ventanas emergentes).
+  function urlApp() { return location.origin + location.pathname.replace(/index\.html$/, ''); }
+
+  $('login-google').addEventListener('click', function () {
+    var clientId = leer('clientId');
+    if (!clientId) return mensaje($('login-msg'), 'El ingreso con Google no está listo. Revisa la configuración en Apps Script.', 'err');
+    var nonce = Array.prototype.map.call(azar(16), function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+    guardar('nonce', nonce);
+    location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: urlApp(),
+      response_type: 'id_token',
+      scope: 'openid email',
+      nonce: nonce,
+      prompt: 'select_account'
+    }).toString();
+  });
+
+  function volviendoDeGoogle() {
+    var h = new URLSearchParams(location.hash.slice(1));
+    if (!h.get('id_token') && !h.get('error')) return false;
+    history.replaceState(null, '', urlApp());
+    mostrarLogin();
+    if (!h.get('id_token')) {
+      mensaje($('login-msg'), 'No se completó el ingreso con Google.', 'err');
+      return true;
+    }
+    mensaje($('login-msg'), 'Verificando…', 'ok');
+    api('loginGoogle', { idToken: h.get('id_token'), nonce: leer('nonce') }).then(function (res) {
+      guardar('nonce', '');
+      estado.pin = '';
+      guardar('pin', '');
+      estado.sesion = res.sesion;
+      guardar('sesion', res.sesion);
+      // La llave de huella/Face ID de antes guardaba el PIN: se ofrece activarla de nuevo.
+      guardar('faceid', '');
+      guardar('bio-no', '');
+      $('login-msg').hidden = true;
+      entrar();
+    }).catch(function (err) {
+      mensaje($('login-msg'), err.message, 'err');
+    });
+    return true;
   }
 
   // El PIN es de 4 dígitos: al completar el cuarto se entra solo, sin tocar "Entrar".
@@ -630,6 +698,7 @@
 
   $('form-pin').addEventListener('submit', function (e) {
     e.preventDefault();
+    if (!$('pin').value.trim()) return;
     estado.pin = $('pin').value.trim();
     mensaje($('login-msg'), 'Verificando…', 'ok');
     api('config').then(function (res) {
@@ -868,7 +937,7 @@
       setTimeout(function () { if (msg.classList.contains('ok')) msg.hidden = true; }, 4000);
     }).catch(function (err) {
       mensaje(msg, 'No se guardó: ' + err.message, 'err');
-      if (/PIN/.test(err.message)) cerrarSesion();
+      if (esErrorDeAcceso(err)) cerrarSesion();
     }).then(function () {
       boton.disabled = false;
       boton.textContent = 'Guardar';
@@ -882,7 +951,7 @@
       li.className = 'vacio';
       li.textContent = 'No se pudo cargar: ' + err.message;
       $('lista').appendChild(li);
-      if (/PIN/.test(err.message)) cerrarSesion();
+      if (esErrorDeAcceso(err)) cerrarSesion();
     });
   }
 
@@ -1472,7 +1541,7 @@
         ? 'Para ver los gráficos falta actualizar el script de Google: pega el Code.gs nuevo y publica una "Nueva versión".'
         : 'No se pudo cargar: ' + err.message;
       mostrarCargando(texto);
-      if (/PIN/.test(err.message)) cerrarSesion();
+      if (esErrorDeAcceso(err)) cerrarSesion();
     });
   }
 
@@ -1802,9 +1871,13 @@
     });
   }
 
+  function esErrorDeAcceso(err) { return /PIN incorrecto|Sesión no válida|no está configurado/.test(err && err.message || ''); }
+
   function cerrarSesion() {
     estado.pin = '';
     guardar('pin', '');
+    estado.sesion = '';
+    guardar('sesion', '');
     $('bloqueo').hidden = true;
     mostrarLogin();
   }
@@ -1842,13 +1915,16 @@
   // iCloud). Así sirve también en otro equipo o en la app instalada en la pantalla de
   // inicio, que tiene su propia memoria y no ve lo guardado en Chrome o Safari.
   function datosLlave() {
-    var b = new TextEncoder().encode('gf1\n' + estado.pin + '\n' + (estado.persona || ''));
+    var b = new TextEncoder().encode(estado.sesion
+      ? 'gf2\n' + estado.sesion + '\n' + (estado.persona || '')
+      : 'gf1\n' + estado.pin + '\n' + (estado.persona || ''));
     return b.length <= 64 ? b : azar(16);
   }
   function leerLlave(userHandle) {
     try {
       var p = new TextDecoder().decode(userHandle).split('\n');
-      if (p[0] === 'gf1' && p[1]) return { pin: p[1], persona: p[2] || '' };
+      if (p[0] === 'gf1' && p[1]) return { pin: p[1], sesion: '', persona: p[2] || '' };
+      if (p[0] === 'gf2' && p[1]) return { pin: '', sesion: p[1], persona: p[2] || '' };
     } catch (e) {}
     return null;
   }
@@ -1899,14 +1975,16 @@
       if (!datos) throw new Error('vieja');
       estado.pin = datos.pin;
       guardar('pin', datos.pin);
+      estado.sesion = datos.sesion;
+      guardar('sesion', datos.sesion);
       if (datos.persona) { estado.persona = datos.persona; guardar('persona', datos.persona); }
       guardar('faceid', aBase64(cred.rawId));
       $('login').hidden = true;
       entrar();
     }).catch(function (err) {
       var txt = err && err.message === 'vieja'
-        ? 'Esa llave es de antes. Entra con el PIN y activa ' + equipo.nombre + ' de nuevo (abajo, en Casa).'
-        : 'No encontré una llave para esta app. Entra con el PIN y después toca "Activar ' + equipo.nombre + '".';
+        ? 'Esa llave es de antes. Entra y activa ' + equipo.nombre + ' de nuevo (abajo, en Casa).'
+        : 'No encontré una llave para esta app. Entra primero y después toca "Activar ' + equipo.nombre + '".';
       mensaje($('login-msg'), txt, 'err');
     });
   });
@@ -1987,9 +2065,9 @@
         pintarCentros();
       }
     }).catch(function (err) {
-      if (/PIN/.test(err.message)) {
+      if (esErrorDeAcceso(err)) {
         cerrarSesion();
-        mensaje($('login-msg'), err.message, 'err');
+        mensaje($('login-msg'), /Sesión no válida/.test(err.message) ? 'Ahora se entra con tu cuenta de Google.' : err.message, /Sesión no válida/.test(err.message) ? 'ok' : 'err');
       } else if (!guardada) {
         mostrarLogin();
         mensaje($('login-msg'), err.message, 'err');
@@ -1997,7 +2075,8 @@
     });
   }
 
-  if (!estado.pin) { pintarFaceId(); return mostrarLogin(); }
+  if (volviendoDeGoogle()) { pintarFaceId(); return; }
+  if (!estado.pin && !estado.sesion) { pintarFaceId(); return mostrarLogin(); }
   if (leer('faceid')) {
     mostrarBloqueo();
     return desbloquear(true);
