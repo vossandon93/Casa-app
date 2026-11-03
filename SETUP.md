@@ -80,6 +80,8 @@ El PIN vive solo ahí, nunca en GitHub.
 
 La lista oficial está en `apps-script/Code.gs` (`CENTROS_INICIALES` y `CUENTAS_INICIALES`). Para dejar la planilla igual a esa lista y mover los gastos antiguos (por ejemplo "Luna" → Familia / Luna), basta con publicar la nueva versión: la primera vez que se abre la app lo hace sola (una sola vez). También se puede forzar eligiendo la función **reordenarCentrosYCuentas** y presionando **Ejecutar**. Cada gasto se cambia en su misma fila (no se duplica), antes se guarda un respaldo oculto de la hoja Gastos, y el registro de ejecución muestra qué se movió.
 
+Cuando se agregan cuentas a la lista oficial (ej. Casa: Agua, Conectividad, Fumigación, Gas, Tintorería), la app las suma sola y también mueve los gastos antiguos a su cuenta: centros viejos con ese nombre o un sinónimo (Internet/Entel → Conectividad) y gastos de Casa sin cuenta cuya descripción lo deja claro (Metrogas → Gas). Si calza con más de una cuenta no se toca. Se cambia la misma fila (sin duplicar), con respaldo oculto, y se puede repetir a mano con **moverGastosAntiguos**.
+
 Los centros y las cuentas siempre se muestran en orden alfabético, también los que se agreguen después desde la app (las hojas Centros y Cuentas se reordenan solas).
 
 ## Pestañas personales (Rendición y Salud)

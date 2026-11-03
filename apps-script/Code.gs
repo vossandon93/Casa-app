@@ -42,7 +42,7 @@ var CARPETA_RENDICIONES = 'Rendiciones - comprobantes';
 var META_PROTEINA_INICIAL = 100;
 var ULTIMAS_RENDICIONES = 50;
 // Se muestra al abrir la URL /exec: sirve para comprobar que Google tiene el código nuevo.
-var VERSION = '2026-11-03 · cuentas de Casa';
+var VERSION = '2026-11-03 · cuentas de Casa + gastos antiguos';
 
 // ---------------------------------------------------------------------------
 // Instalación: ejecutar una vez desde el editor (botón "Ejecutar" con setup).
@@ -466,6 +466,7 @@ function agregarCentro_(nombre) {
 function config_() {
   reordenarSiFalta_();
   agregarCuentasFaltantes_();
+  moverGastosAntiguosSiFalta_();
   var cuentas = leerCuentas_();
   Object.keys(cuentas).forEach(function (c) { cuentas[c] = alfabetico_(cuentas[c]); });
   return { ok: true, centros: alfabetico_(leerLista_(HOJA_CENTROS)), personas: leerLista_(HOJA_PERSONAS), cuentas: cuentas };
@@ -516,6 +517,109 @@ function agregarCuentasFaltantes_() {
       ordenarHoja_(HOJA_CUENTAS, 2);
     }
     props.setProperty('CUENTAS_VERSION', CUENTAS_VERSION);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Gastos antiguos → cuentas nuevas (corre sola una vez por GASTOS_VERSION, o a mano
+// con moverGastosAntiguos). Cambia la MISMA fila (nunca copia), así no se suma doble:
+// 1. Centro antiguo con nombre de cuenta o sinónimo (Gas, Agua, Internet, Entel…)
+//    → su centro nuevo con esa cuenta (ej. "Internet" → Casa / Conectividad).
+// 2. Gastos de Casa sin cuenta cuya descripción la deja clara (ej. "Metrogas",
+//    "plan Entel") → esa cuenta. Si calza con más de una cuenta, no se toca.
+// Antes guarda un respaldo oculto de la hoja Gastos.
+// ---------------------------------------------------------------------------
+var GASTOS_VERSION = '2026-11-03 casa';
+var SINONIMOS_CENTRO = {
+  'internet': ['Casa', 'Conectividad'], 'entel': ['Casa', 'Conectividad'], 'plan entel': ['Casa', 'Conectividad'],
+  'wifi': ['Casa', 'Conectividad'], 'telefono': ['Casa', 'Conectividad'], 'celular': ['Casa', 'Conectividad'],
+  'fumigacion': ['Casa', 'Fumigación'], 'tintoreria': ['Casa', 'Tintorería'], 'lavanderia': ['Casa', 'Tintorería'],
+  'gas': ['Casa', 'Gas'], 'agua': ['Casa', 'Agua']
+};
+var PALABRAS_CUENTA = {
+  'Casa': {
+    'Gas': /\b(gas|metrogas|lipigas|abastible|gasco|balon|balones)\b/,
+    'Agua': /\b(agua|aguas andinas|essbio|esval|smapa)\b/,
+    'Conectividad': /\b(internet|entel|wifi|wi-fi|fibra|plan movil|plan celular|vtr|movistar|wom)\b/,
+    'Fumigación': /\b(fumigacion|fumigar|fumigador|plagas|desratizacion)\b/,
+    'Tintorería': /\b(tintoreria|lavanderia|lavaseco)\b/
+  }
+};
+
+function sinTildes_(t) {
+  return String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function moverGastosAntiguosSiFalta_() {
+  if (PropertiesService.getScriptProperties().getProperty('GASTOS_VERSION') === GASTOS_VERSION) return;
+  moverGastosAntiguos();
+}
+
+function moverGastosAntiguos() {
+  var ss = libro_();
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var gastos = hojaGastos_();
+    asegurarColumnaCuenta_(gastos);
+    var n = gastos.getLastRow() - 1;
+    var cambios = {};
+    if (n > 0) {
+      var centros = leerLista_(HOJA_CENTROS, ss);
+      var oficial = {};
+      centros.forEach(function (c) { oficial[sinTildes_(c)] = c; });
+      var cuentas = leerCuentas_(ss);
+      // Nombre de cuenta (sin tildes) → [centro, cuenta], más los sinónimos.
+      var destinoDe = {};
+      Object.keys(cuentas).forEach(function (c) {
+        cuentas[c].forEach(function (cu) { destinoDe[sinTildes_(cu)] = [c, cu]; });
+      });
+      Object.keys(SINONIMOS_CENTRO).forEach(function (k) {
+        var d = SINONIMOS_CENTRO[k];
+        if (oficial[sinTildes_(d[0])]) destinoDe[k] = [oficial[sinTildes_(d[0])], d[1]];
+      });
+
+      var rango = gastos.getRange(2, 1, n, COLUMNAS_GASTOS.length);
+      var filas = rango.getValues();
+      filas.forEach(function (f) {
+        if (!f[0] && !f[3]) return;
+        var centro = String(f[2]).trim(), cuenta = String(f[7] || '').trim();
+        var antes = centro + (cuenta ? ' / ' + cuenta : '');
+        var clave = sinTildes_(centro);
+        if (!oficial[clave] && destinoDe[clave]) {
+          centro = destinoDe[clave][0];
+          cuenta = cuenta || destinoDe[clave][1];
+        }
+        var reglas = PALABRAS_CUENTA[centro];
+        if (reglas && !cuenta) {
+          var desc = sinTildes_(f[4]);
+          var calzan = Object.keys(reglas).filter(function (cu) {
+            return reglas[cu].test(desc) && (cuentas[centro] || []).indexOf(cu) !== -1;
+          });
+          if (calzan.length === 1) cuenta = calzan[0];
+        }
+        var despues = centro + (cuenta ? ' / ' + cuenta : '');
+        if (despues !== antes) {
+          f[2] = centro;
+          f[7] = cuenta;
+          var k = antes + (f[4] ? ' ("' + String(f[4]).slice(0, 30) + '")' : '') + '  →  ' + despues;
+          cambios[k] = (cambios[k] || 0) + 1;
+        }
+      });
+      var claves = Object.keys(cambios);
+      if (claves.length) {
+        var tz = ss.getSpreadsheetTimeZone();
+        gastos.copyTo(ss).setName('Gastos respaldo ' + Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd HH.mm.ss')).hideSheet();
+        rango.setValues(filas);
+        actualizarResumenes_(ss);
+      }
+    }
+    var lineas = Object.keys(cambios);
+    Logger.log(lineas.length ? 'Gastos movidos:\n' + lineas.map(function (k) { return '  ' + k + '  (' + cambios[k] + ')'; }).join('\n') : 'No había gastos que mover.');
+    props.setProperty('GASTOS_VERSION', GASTOS_VERSION);
   } finally {
     lock.releaseLock();
   }
