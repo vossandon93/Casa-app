@@ -88,6 +88,8 @@ Los centros y las cuentas siempre se muestran en orden alfabético, también los
 
 Columnas: ID · Fecha · **Centro de costo · Cuenta** · Monto · Descripción · Registró · Creado. El script busca cada columna por su encabezado, así que no cambies los títulos (sí puedes mover columnas). Las planillas antiguas, con la Cuenta al final, se ordenan solas la primera vez que se abre la app (o a mano con **ordenarHojaGastos**): se mueve la columna completa, sin copiar ni duplicar gastos.
 
+**Editar a mano:** las columnas Centro de costo y Cuenta tienen listas desplegables (la de Cuenta muestra solo las cuentas del centro de esa fila; si cambias el centro y la cuenta no corresponde, se borra y te avisa). Al editar la hoja Gastos los resúmenes se recalculan solos. Para encontrar filas con errores (centro, cuenta, fecha o monto inválidos) ejecuta **revisarGastos** y mira el registro.
+
 ## Acceso privado: solo con cuentas de Google autorizadas
 
 Sin esto la app se protege solo con el PIN (con límite: 5 intentos fallidos bloquean el ingreso 15 minutos). Con esto, **solo entran los correos que tú elijas**, con su cuenta de Google, y el PIN deja de servir. Los correos quedan en las propiedades del script, no en GitHub.

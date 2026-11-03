@@ -45,7 +45,7 @@ var CARPETA_RENDICIONES = 'Rendiciones - comprobantes';
 var META_PROTEINA_INICIAL = 100;
 var ULTIMAS_RENDICIONES = 50;
 // Se muestra al abrir la URL /exec: sirve para comprobar que Google tiene el código nuevo.
-var VERSION = '2026-11-03 · hoja Gastos con Cuenta al lado del centro';
+var VERSION = '2026-11-03 · listas desplegables y resúmenes automáticos';
 
 // ---------------------------------------------------------------------------
 // Instalación: ejecutar una vez desde el editor (botón "Ejecutar" con setup).
@@ -103,6 +103,7 @@ function setup() {
   }
 
   crearResumenes_(ss);
+  aplicarListasGastos_(ss);
 
   prepararHoja_(ss, HOJA_RENDICIONES, COLUMNAS_RENDICIONES);
   prepararHoja_(ss, HOJA_AZUCAR, COLUMNAS_AZUCAR);
@@ -445,6 +446,121 @@ function ordenarHojaGastos() {
 }
 
 // ---------------------------------------------------------------------------
+// Editar la planilla a mano
+// - onEdit: al editar la hoja Gastos se recalculan los resúmenes solos; al cambiar
+//   las hojas Centros o Cuentas se actualizan las listas desplegables.
+// - Listas desplegables en Gastos: Centro de costo (de la hoja Centros) y Cuenta
+//   (solo las cuentas del centro de esa fila).
+// - revisarGastos: registra las filas con centro, cuenta, fecha o monto inválidos.
+// ---------------------------------------------------------------------------
+function onEdit(e) {
+  try {
+    if (!e || !e.range) return;
+    var hoja = e.range.getSheet();
+    var nombre = hoja.getName();
+    var ss = e.source || libro_();
+    if (nombre === HOJA_CENTROS || nombre === HOJA_CUENTAS) {
+      aplicarListasGastos_(ss);
+      return;
+    }
+    if (nombre !== HOJA_GASTOS) return;
+    var desde = Math.max(e.range.getRow(), 2);
+    var hasta = e.range.getLastRow();
+    if (hasta < 2) return;
+    var mapa = mapaGastos_(hoja);
+    var colCentro = mapa[2] + 1, colCuenta = mapa[7] + 1;
+    if (e.range.getColumn() <= colCentro && e.range.getLastColumn() >= colCentro) {
+      // Cambió el centro: la cuenta anterior se borra si no es de este centro.
+      var cuentas = leerCuentas_(ss);
+      var centros = hoja.getRange(desde, colCentro, hasta - desde + 1, 1).getValues();
+      var celdasCuenta = hoja.getRange(desde, colCuenta, hasta - desde + 1, 1);
+      var actuales = celdasCuenta.getValues();
+      var borradas = 0;
+      var nuevas = actuales.map(function (f, i) {
+        var cu = String(f[0]).trim();
+        if (cu && (cuentas[String(centros[i][0]).trim()] || []).indexOf(cu) === -1) { borradas++; return ['']; }
+        return [f[0]];
+      });
+      aplicarListaCuentas_(hoja, desde, hasta - desde + 1, ss);
+      if (borradas) {
+        celdasCuenta.setValues(nuevas);
+        ss.toast('Se borró la cuenta de ' + borradas + ' fila(s) porque no era de ese centro. Elígela de nuevo.', 'Gastos', 6);
+      }
+    }
+    actualizarResumenes_(ss);
+  } catch (err) {
+    // Editar a mano nunca debe fallar por esto.
+  }
+}
+
+function aplicarListasGastos_(ss) {
+  ss = ss || libro_();
+  var hoja = ss.getSheetByName(HOJA_GASTOS);
+  var hojaCentros = ss.getSheetByName(HOJA_CENTROS);
+  if (!hoja || !hojaCentros) return;
+  asegurarColumnaCuenta_(hoja);
+  var mapa = mapaGastos_(hoja);
+  var n = hoja.getMaxRows() - 1;
+  if (n < 1) return;
+  var reglaCentro = SpreadsheetApp.newDataValidation()
+    .requireValueInRange(hojaCentros.getRange('A2:A'), true)
+    .setAllowInvalid(false)
+    .setHelpText('Elige un centro de la hoja Centros (para uno nuevo, agrégalo ahí o desde la app).')
+    .build();
+  hoja.getRange(2, mapa[2] + 1, n, 1).setDataValidation(reglaCentro);
+  aplicarListaCuentas_(hoja, 2, n, ss);
+}
+
+// Lista de cuentas de cada fila según su centro (filas sin centro: sin lista).
+function aplicarListaCuentas_(hoja, desde, n, ss) {
+  if (n < 1) return;
+  ss = ss || libro_();
+  var mapa = mapaGastos_(hoja);
+  var cuentas = leerCuentas_(ss);
+  var reglas = {};
+  var valores = hoja.getRange(desde, mapa[2] + 1, n, 1).getValues().map(function (f) {
+    var centro = String(f[0]).trim();
+    if (!centro || !(cuentas[centro] || []).length) return [null];
+    if (!reglas[centro]) {
+      reglas[centro] = SpreadsheetApp.newDataValidation()
+        .requireValueInList(alfabetico_(cuentas[centro]), true)
+        .setAllowInvalid(false)
+        .setHelpText('Cuentas de ' + centro + ' (o déjala vacía).')
+        .build();
+    }
+    return [reglas[centro]];
+  });
+  hoja.getRange(desde, mapa[7] + 1, n, 1).setDataValidations(valores);
+}
+
+var LISTAS_VERSION = '2026-11-03';
+function listasGastosSiFalta_() {
+  if (propiedad_('LISTAS_VERSION') === LISTAS_VERSION) return;
+  aplicarListasGastos_();
+  PropertiesService.getScriptProperties().setProperty('LISTAS_VERSION', LISTAS_VERSION);
+}
+
+// Ejecutar desde el editor: muestra en el registro las filas que no cuadran.
+function revisarGastos() {
+  var ss = libro_();
+  var hoja = hojaGastos_();
+  var centros = leerLista_(HOJA_CENTROS, ss);
+  var cuentas = leerCuentas_(ss);
+  var problemas = [];
+  leerGastos_(hoja).forEach(function (f, i) {
+    if (!f[0] && !f[3] && !f[2]) return;
+    var fila = i + 2, motivos = [];
+    var centro = String(f[2]).trim(), cuenta = String(f[7] || '').trim();
+    if (centros.indexOf(centro) === -1) motivos.push('centro "' + centro + '" no está en la hoja Centros');
+    else if (cuenta && (cuentas[centro] || []).indexOf(cuenta) === -1) motivos.push('cuenta "' + cuenta + '" no es de ' + centro);
+    if (!(f[1] instanceof Date)) motivos.push('fecha "' + f[1] + '" no es una fecha');
+    if (typeof f[3] !== 'number' || !(f[3] > 0)) motivos.push('monto "' + f[3] + '" no es un número');
+    if (motivos.length) problemas.push('Fila ' + fila + ': ' + motivos.join('; ') + (f[4] ? '  (' + f[4] + ')' : ''));
+  });
+  Logger.log(problemas.length ? problemas.length + ' fila(s) para revisar:\n' + problemas.join('\n') : 'Todo bien: no hay filas con problemas.');
+}
+
+// ---------------------------------------------------------------------------
 // API web. Todas las acciones van por POST (text/plain para evitar CORS).
 // ---------------------------------------------------------------------------
 
@@ -675,6 +791,7 @@ function config_() {
   reordenarSiFalta_();
   agregarCuentasFaltantes_();
   moverGastosAntiguosSiFalta_();
+  listasGastosSiFalta_();
   var cuentas = leerCuentas_();
   Object.keys(cuentas).forEach(function (c) { cuentas[c] = alfabetico_(cuentas[c]); });
   return { ok: true, centros: alfabetico_(leerLista_(HOJA_CENTROS)), personas: leerLista_(HOJA_PERSONAS), cuentas: cuentas };
@@ -881,6 +998,7 @@ function agregarCuenta_(centro, nombre) {
   } finally {
     lock.releaseLock();
   }
+  aplicarListasGastos_();
 }
 
 function agregarGasto_(body) {
@@ -902,6 +1020,7 @@ function agregarGasto_(body) {
     var hoja = hojaGastos_();
     asegurarColumnaCuenta_(hoja);
     hoja.appendRow(filaFisicaGastos_(hoja, [Utilities.getUuid(), fecha, centro, monto, descripcion, persona, new Date(), cuenta]));
+    aplicarListaCuentas_(hoja, hoja.getLastRow(), 1);
   } finally {
     lock.releaseLock();
   }
