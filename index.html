@@ -5,8 +5,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Gastos Familia</title>
   <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#f4f6f5" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0b0f0e" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" id="theme-color" content="#f4f6f5">
+  <script>
+    // Tema: Automático (sigue al equipo), Claro u Oscuro. Se aplica antes de pintar para no parpadear.
+    (function () {
+      var elegido = 'auto';
+      try { elegido = localStorage.getItem('gastos.tema') || 'auto'; } catch (e) {}
+      var mq = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
+      function aplicar() {
+        var oscuro = elegido === 'oscuro' || (elegido === 'auto' && mq && mq.matches);
+        var raiz = document.documentElement;
+        raiz.setAttribute('data-tema', oscuro ? 'oscuro' : 'claro');
+        raiz.style.colorScheme = oscuro ? 'dark' : 'light';
+        var meta = document.getElementById('theme-color');
+        if (meta) meta.setAttribute('content', oscuro ? '#000000' : '#f4f6f5');
+      }
+      if (mq) (mq.addEventListener ? mq.addEventListener('change', aplicar) : mq.addListener(aplicar));
+      window.temaApp = {
+        actual: function () { return elegido; },
+        elegir: function (t) {
+          elegido = t;
+          try { localStorage.setItem('gastos.tema', t); } catch (e) {}
+          aplicar();
+        }
+      };
+      aplicar();
+    })();
+  </script>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Gastos">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -22,6 +47,8 @@
       --border: #d9e0de;
       --accent: #0f766e;
       --accent-text: #ffffff;
+      --accent-fill: #0f766e;
+      --on-accent: #ffffff;
       --accent-soft: #e0f2ef;
       --danger: #b42318;
       --ok: #157f3b;
@@ -30,27 +57,28 @@
       /* Colores de los centros en los gráficos (paleta validada para daltonismo). */
       --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s-otros: #a3aaa8;
     }
-    :root { color-scheme: light dark; }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        /* Grises neutros (estilo iOS) en vez del verde barroso de antes. */
-        --bg: #0b0f0e;
-        --card: #161b1a;
-        --text: #f2f5f4;
-        --muted: #9aa5a2;
-        --border: #262d2c;
-        --accent: #3cc6b4;
-        --accent-text: #04201c;
-        --accent-soft: rgba(60, 198, 180, .16);
-        --danger: #ff8a80;
-        --ok: #5fd08a;
-        --ok-soft: rgba(95, 208, 138, .14);
-        --err-soft: rgba(255, 138, 128, .14);
-        --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s-otros: #5d6966;
-      }
+    /* Modo oscuro estilo iPhone: negro puro de fondo, tarjetas gris grafito sin
+       bordes, campos un tono más claro y el verde en versión suave. */
+    :root[data-tema="oscuro"] {
+      --bg: #000000;
+      --card: #1c1c1e;
+      --text: #f5f5f7;
+      --muted: #8e8e93;
+      --border: #38383a;
+      --accent: #5fd4c4;
+      --accent-fill: #1f9d8e;
+      --on-accent: #ffffff;
+      --accent-soft: rgba(95, 212, 196, .15);
+      --danger: #ff6961;
+      --ok: #30d158;
+      --ok-soft: rgba(48, 209, 88, .15);
+      --err-soft: rgba(255, 105, 97, .15);
+      --campo: #2c2c2e;
+      --s1: #409cff; --s2: #ff9f0a; --s3: #30d158; --s4: #ffd60a; --s5: #ff6482; --s-otros: #636366;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; }
+    html { background: var(--bg); }
     body {
       background: var(--bg);
       color: var(--text);
@@ -91,7 +119,7 @@
     .monto { font-size: 28px; font-weight: 700; }
     .btn {
       width: 100%; border: 0; border-radius: 14px; padding: 16px; margin-top: 18px;
-      background: var(--accent); color: var(--accent-text); font: inherit; font-size: 18px; font-weight: 700; cursor: pointer;
+      background: var(--accent-fill); color: var(--on-accent); font: inherit; font-size: 18px; font-weight: 700; cursor: pointer;
     }
     .btn:disabled { opacity: .5; }
     .msg { border-radius: 12px; padding: 12px; margin-top: 12px; font-size: 15px; }
@@ -160,7 +188,7 @@
       border: 0; background: none; color: var(--text); font: inherit; font-size: 16px; height: 40px; border-radius: 999px; cursor: pointer;
     }
     .cal-grid button.hoy { color: var(--accent); font-weight: 700; }
-    .cal-grid button.sel { background: var(--accent); color: var(--accent-text); font-weight: 700; }
+    .cal-grid button.sel { background: var(--accent-fill); color: var(--on-accent); font-weight: 700; }
     .cal-grid button:disabled { color: var(--border); }
 
     /* Resumen */
@@ -218,7 +246,7 @@
       flex: 1; border: 0; background: none; color: var(--muted); font: inherit; font-size: 15px; font-weight: 600;
       padding: 8px 4px; border-radius: 999px; cursor: pointer;
     }
-    .subtabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-text); }
+    .subtabs button[aria-selected="true"] { background: var(--accent-fill); color: var(--on-accent); }
 
     /* Rendición */
     .foto-btn {
@@ -261,20 +289,24 @@
     .barras-cont { position: relative; }
     .linea-meta { position: absolute; left: 0; right: 0; border-top: 2px dashed var(--muted); pointer-events: none; }
     .barras i.cumple { background: var(--ok); }
-    @media (prefers-color-scheme: dark) {
-      .card { box-shadow: inset 0 1px 0 rgba(255,255,255,.03); }
-      input, select, .campo-fecha, .foto-btn { background: #0f1413; border-color: #2b3332; }
-      input::placeholder { color: #66716e; }
-      .tabs { background: color-mix(in srgb, var(--card) 80%, transparent); box-shadow: 0 6px 20px rgba(0,0,0,.45); }
-      .tabs button[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); }
-      .subtabs { background: var(--card); }
-      .seg button[aria-pressed="true"] { background: #262d2c; box-shadow: none; }
-      .chip, .chips button, .atajos button { background: #1d2322; }
-      .leyenda .barra, .progreso { background: #232a29; }
-      .dato { background: #1d2322; }
-      .dona circle[stroke="var(--border)"] { stroke: #232a29; }
-      .btn { box-shadow: 0 6px 18px rgba(60, 198, 180, .18); }
-    }
+    [data-tema="oscuro"] .card { border-color: transparent; }
+    [data-tema="oscuro"] input, [data-tema="oscuro"] select,
+    [data-tema="oscuro"] .campo-fecha, [data-tema="oscuro"] .foto-btn { background-color: var(--campo); border-color: transparent; }
+    [data-tema="oscuro"] input::placeholder { color: #6e6e73; }
+    [data-tema="oscuro"] .tabs { background: rgba(28, 28, 30, .82); border-color: transparent; box-shadow: 0 8px 24px rgba(0,0,0,.6); }
+    [data-tema="oscuro"] .subtabs { border-color: transparent; }
+    [data-tema="oscuro"] .seg button[aria-pressed="true"], [data-tema="oscuro"] .seg-tema button[aria-pressed="true"] { background: #3a3a3c; box-shadow: none; }
+    [data-tema="oscuro"] .chip, [data-tema="oscuro"] .chips button, [data-tema="oscuro"] .atajos button { background: var(--campo); }
+    [data-tema="oscuro"] .dato, [data-tema="oscuro"] .leyenda .barra, [data-tema="oscuro"] .progreso { background: var(--campo); }
+    [data-tema="oscuro"] .dona circle[stroke="var(--border)"] { stroke: var(--campo); }
+    [data-tema="oscuro"] .lista li { border-top-color: #2c2c2e; }
+    [data-tema="oscuro"] .borrar { border-color: #3a3a3c; }
+
+    /* Selector de apariencia */
+    .seg-tema { display: flex; background: var(--bg); border-radius: 999px; padding: 3px; }
+    .seg-tema button { border: 0; background: none; color: var(--muted); font: inherit; font-size: 14px; font-weight: 600; padding: 7px 12px; border-radius: 999px; cursor: pointer; }
+    .seg-tema button[aria-pressed="true"] { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+    .bio-login { margin-top: 10px; background: none; border: 1px solid var(--accent); color: var(--accent); }
 
     /* iPad y pantallas anchas: dos columnas en vez de una tira angosta. */
     @media (min-width: 760px) {
@@ -308,6 +340,7 @@
         <label for="pin">PIN</label>
         <input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" required>
         <button class="btn" type="submit">Entrar</button>
+        <button class="btn bio-login" id="login-bio" type="button" hidden>Entrar con <span class="bio-nombre">Face ID</span></button>
       </form>
       <div id="elegir-persona" hidden>
         <label>¿Quién eres?</label>
@@ -400,6 +433,15 @@
         <div class="total" id="faceid-estado"></div>
       </div>
       <button class="btn-sec" id="faceid-toggle" type="button"></button>
+    </section>
+
+    <section class="card fila">
+      <div>Apariencia</div>
+      <div class="seg-tema" id="tema">
+        <button type="button" data-tema="auto">Auto</button>
+        <button type="button" data-tema="claro">Claro</button>
+        <button type="button" data-tema="oscuro">Oscuro</button>
+      </div>
     </section>
     </div>
 
@@ -1796,13 +1838,28 @@
     return PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().catch(function () { return false; });
   }
 
+  // La llave guarda el PIN y la persona (cifrados por el equipo, en el Llavero de
+  // iCloud). Así sirve también en otro equipo o en la app instalada en la pantalla de
+  // inicio, que tiene su propia memoria y no ve lo guardado en Chrome o Safari.
+  function datosLlave() {
+    var b = new TextEncoder().encode('gf1\n' + estado.pin + '\n' + (estado.persona || ''));
+    return b.length <= 64 ? b : azar(16);
+  }
+  function leerLlave(userHandle) {
+    try {
+      var p = new TextDecoder().decode(userHandle).split('\n');
+      if (p[0] === 'gf1' && p[1]) return { pin: p[1], persona: p[2] || '' };
+    } catch (e) {}
+    return null;
+  }
+
   function activarFaceId() {
     return navigator.credentials.create({ publicKey: {
       challenge: azar(32),
       rp: { name: 'Gastos Familia', id: location.hostname || undefined },
-      user: { id: azar(16), name: estado.persona || 'Gastos', displayName: estado.persona || 'Gastos' },
+      user: { id: datosLlave(), name: 'Gastos Familia · ' + (estado.persona || ''), displayName: 'Gastos Familia · ' + (estado.persona || '') },
       pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
-      authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred' },
+      authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'required', requireResidentKey: true },
       timeout: 60000
     } }).then(function (cred) {
       guardar('faceid', aBase64(cred.rawId));
@@ -1826,15 +1883,45 @@
       $('faceid-toggle').textContent = activo ? 'Desactivar' : 'Activar';
       // Si se puede y no está activo, se ofrece arriba (hasta que diga "no").
       $('bio-invita').hidden = !ok || activo || leer('bio-no') === '1';
+      $('login-bio').hidden = !ok;
     });
   }
+
+  // Entrar sin PIN con una llave ya creada (en este equipo o sincronizada por iCloud).
+  $('login-bio').addEventListener('click', function () {
+    navigator.credentials.get({ publicKey: {
+      challenge: azar(32),
+      rpId: location.hostname || undefined,
+      userVerification: 'required',
+      timeout: 60000
+    } }).then(function (cred) {
+      var datos = cred.response.userHandle && leerLlave(cred.response.userHandle);
+      if (!datos) throw new Error('vieja');
+      estado.pin = datos.pin;
+      guardar('pin', datos.pin);
+      if (datos.persona) { estado.persona = datos.persona; guardar('persona', datos.persona); }
+      guardar('faceid', aBase64(cred.rawId));
+      $('login').hidden = true;
+      entrar();
+    }).catch(function (err) {
+      var txt = err && err.message === 'vieja'
+        ? 'Esa llave es de antes. Entra con el PIN y activa ' + equipo.nombre + ' de nuevo (abajo, en Casa).'
+        : 'No encontré una llave para esta app. Entra con el PIN y después toca "Activar ' + equipo.nombre + '".';
+      mensaje($('login-msg'), txt, 'err');
+    });
+  });
 
   function activarBio() {
     activarFaceId().then(function () {
       pintarFaceId();
       mensaje($('gasto-msg'), '✓ Listo: la próxima vez entras con ' + equipo.nombre, 'ok');
     }).catch(function (err) {
-      if (err && err.name !== 'NotAllowedError') alert('No se pudo activar ' + equipo.nombre + ': ' + err.message);
+      // Antes este error se callaba y parecía que no pasaba nada.
+      var ayuda = /iPad|iPhone|Macintosh/.test(navigator.userAgent)
+        ? ' Revisa que el Llavero de iCloud esté activado (Ajustes → tu nombre → iCloud → Contraseñas y llavero) y que el equipo tenga código y huella/Face ID configurados.'
+        : '';
+      var motivo = err && err.name === 'NotAllowedError' ? 'Se canceló o el equipo no lo permitió.' : (err && err.message) || '';
+      mensaje($('gasto-msg'), 'No se pudo activar ' + equipo.nombre + '. ' + motivo + ayuda, 'err');
     });
   }
   $('bio-si').addEventListener('click', activarBio);
@@ -1847,6 +1934,16 @@
     }
     activarBio();
   });
+
+  // Apariencia
+  function pintarTema() {
+    var t = window.temaApp ? temaApp.actual() : 'auto';
+    document.querySelectorAll('#tema button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.tema === t)); });
+  }
+  document.querySelectorAll('#tema button').forEach(function (b) {
+    b.addEventListener('click', function () { temaApp.elegir(b.dataset.tema); pintarTema(); });
+  });
+  pintarTema();
 
   function mostrarBloqueo() {
     $('login').hidden = true;
@@ -1900,7 +1997,7 @@
     });
   }
 
-  if (!estado.pin) return mostrarLogin();
+  if (!estado.pin) { pintarFaceId(); return mostrarLogin(); }
   if (leer('faceid')) {
     mostrarBloqueo();
     return desbloquear(true);
