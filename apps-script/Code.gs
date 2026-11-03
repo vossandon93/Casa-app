@@ -19,7 +19,10 @@ var HOJA_RENDICIONES = 'Rendiciones';
 var HOJA_AZUCAR = 'Azúcar';
 var HOJA_PROTEINA = 'Proteína';
 
+// Orden lógico que usa el código (f[0]..f[7]). En la hoja las columnas se buscan por
+// su encabezado, así que pueden estar en otro orden (ORDEN_HOJA_GASTOS).
 var COLUMNAS_GASTOS = ['ID', 'Fecha', 'Centro de costo', 'Monto', 'Descripción', 'Registró', 'Creado', 'Cuenta'];
+var ORDEN_HOJA_GASTOS = ['ID', 'Fecha', 'Centro de costo', 'Cuenta', 'Monto', 'Descripción', 'Registró', 'Creado'];
 var CENTROS_INICIALES = ['Auto', 'Familia', 'Salud', 'Vicky', 'Fran', 'Vicente', 'Casa'];
 var PERSONAS_INICIALES = ['Vicente', 'Fran'];
 // Cuentas que se crean solas si existe un centro con ese nombre (sin importar mayúsculas).
@@ -42,7 +45,7 @@ var CARPETA_RENDICIONES = 'Rendiciones - comprobantes';
 var META_PROTEINA_INICIAL = 100;
 var ULTIMAS_RENDICIONES = 50;
 // Se muestra al abrir la URL /exec: sirve para comprobar que Google tiene el código nuevo.
-var VERSION = '2026-11-03 · acceso con Google + límite de intentos';
+var VERSION = '2026-11-03 · hoja Gastos con Cuenta al lado del centro';
 
 // ---------------------------------------------------------------------------
 // Instalación: ejecutar una vez desde el editor (botón "Ejecutar" con setup).
@@ -63,13 +66,10 @@ function setup() {
 
   var gastos = obtenerOCrearHoja_(ss, HOJA_GASTOS);
   if (gastos.getLastRow() === 0) {
-    gastos.appendRow(COLUMNAS_GASTOS);
+    gastos.appendRow(ORDEN_HOJA_GASTOS);
   }
-  gastos.setFrozenRows(1);
-  gastos.getRange(1, 1, 1, COLUMNAS_GASTOS.length).setFontWeight('bold');
-  gastos.getRange('B:B').setNumberFormat('dd/mm/yyyy');
-  gastos.getRange('D:D').setNumberFormat('$#,##0');
-  gastos.getRange('G:G').setNumberFormat('dd/mm/yyyy hh:mm');
+  ordenarColumnasGastos_(gastos);
+  formatoGastos_(gastos);
   gastos.hideColumns(1);
   asegurarColumnaCuenta_(gastos);
 
@@ -198,8 +198,7 @@ function reordenarCentrosYCuentas() {
 
     var cambios = {}, sinCentro = {}, n = gastos.getLastRow() - 1;
     if (n > 0) {
-      var rango = gastos.getRange(2, 1, n, COLUMNAS_GASTOS.length);
-      var filas = rango.getValues();
+      var filas = leerGastos_(gastos);
       filas.forEach(function (f) {
         if (!f[0] && !f[3]) return;
         var centro = String(f[2]).trim(), cuenta = String(f[7] || '').trim();
@@ -227,7 +226,7 @@ function reordenarCentrosYCuentas() {
           cambios[k] = (cambios[k] || 0) + 1;
         }
       });
-      rango.setValues(filas);
+      guardarCentroYCuenta_(gastos, filas);
     }
     actualizarResumenes_(ss);
 
@@ -324,7 +323,7 @@ function totalesPorMes_(ss) {
   if (!hoja || hoja.getLastRow() < 2) return [];
   var tz = ss.getSpreadsheetTimeZone();
   var grupos = {};
-  hoja.getRange(2, 1, hoja.getLastRow() - 1, COLUMNAS_GASTOS.length).getValues().forEach(function (f) {
+  leerGastos_(hoja).forEach(function (f) {
     var monto = Number(f[3]) || 0;
     if (!(f[1] instanceof Date) || !monto) return;
     var mes = Utilities.formatDate(f[1], tz, 'yyyy-MM');
@@ -352,9 +351,97 @@ function obtenerOCrearHoja_(ss, nombre) {
 
 // Planillas creadas antes de las cuentas no tienen el título de esa columna.
 function asegurarColumnaCuenta_(hoja) {
-  var col = COLUMNAS_GASTOS.length;
-  var celda = hoja.getRange(1, col);
-  if (!String(celda.getValue() || '').trim()) celda.setValue(COLUMNAS_GASTOS[col - 1]).setFontWeight('bold');
+  if (encabezadosGastos_(hoja).indexOf('Cuenta') !== -1) return;
+  var col = Math.max(hoja.getLastColumn(), COLUMNAS_GASTOS.length - 1) + 1;
+  hoja.getRange(1, col).setValue('Cuenta').setFontWeight('bold');
+}
+
+function encabezadosGastos_(hoja) {
+  var ancho = Math.max(hoja.getLastColumn(), 1);
+  return hoja.getRange(1, 1, 1, ancho).getValues()[0].map(function (v) { return String(v).trim(); });
+}
+
+// Para cada columna lógica (COLUMNAS_GASTOS), su posición (0..) en la hoja.
+function mapaGastos_(hoja) {
+  var enc = encabezadosGastos_(hoja);
+  return COLUMNAS_GASTOS.map(function (nombre, i) {
+    var j = enc.indexOf(nombre);
+    return j === -1 ? i : j;
+  });
+}
+
+// Filas de la hoja Gastos en orden lógico, desde la fila `desde` (por defecto todas).
+function leerGastos_(hoja, desde, n) {
+  desde = desde || 2;
+  if (n === undefined) n = hoja.getLastRow() - desde + 1;
+  if (n <= 0) return [];
+  var mapa = mapaGastos_(hoja);
+  var ancho = Math.max.apply(null, mapa) + 1;
+  return hoja.getRange(desde, 1, n, ancho).getValues().map(function (f) {
+    return mapa.map(function (j) { return f[j]; });
+  });
+}
+
+function filaFisicaGastos_(hoja, logica) {
+  var mapa = mapaGastos_(hoja);
+  var fila = [];
+  for (var k = 0; k <= Math.max.apply(null, mapa); k++) fila.push('');
+  mapa.forEach(function (j, i) { fila[j] = logica[i]; });
+  return fila;
+}
+
+// Escribe solo las columnas Centro de costo y Cuenta (lo único que cambian las migraciones).
+function guardarCentroYCuenta_(hoja, filas) {
+  if (!filas.length) return;
+  var mapa = mapaGastos_(hoja);
+  hoja.getRange(2, mapa[2] + 1, filas.length, 1).setValues(filas.map(function (f) { return [f[2]]; }));
+  hoja.getRange(2, mapa[7] + 1, filas.length, 1).setValues(filas.map(function (f) { return [f[7]]; }));
+}
+
+// Deja la hoja Gastos con la Cuenta al lado del Centro de costo. Mueve la columna
+// completa (con sus datos y formato): no se copia ni se duplica ningún gasto.
+function ordenarColumnasGastos_(hoja) {
+  asegurarColumnaCuenta_(hoja);
+  var enc = encabezadosGastos_(hoja);
+  var colCentro = enc.indexOf('Centro de costo') + 1;
+  var colCuenta = enc.indexOf('Cuenta') + 1;
+  if (colCentro > 0 && colCuenta > colCentro + 1) {
+    hoja.moveColumns(hoja.getRange(1, colCuenta), colCentro + 1);
+    return true;
+  }
+  return false;
+}
+
+function formatoGastos_(hoja) {
+  var enc = encabezadosGastos_(hoja);
+  hoja.setFrozenRows(1);
+  hoja.getRange(1, 1, 1, enc.length).setFontWeight('bold');
+  var formatos = { 'Fecha': 'dd/mm/yyyy', 'Monto': '$#,##0', 'Creado': 'dd/mm/yyyy hh:mm' };
+  Object.keys(formatos).forEach(function (nombre) {
+    var c = enc.indexOf(nombre) + 1;
+    if (c > 0) hoja.getRange(2, c, Math.max(hoja.getMaxRows() - 1, 1), 1).setNumberFormat(formatos[nombre]);
+  });
+}
+
+// Corre sola una vez (al abrir la app con este código) o a mano con ordenarHojaGastos.
+var COLUMNAS_VERSION = '2026-11-03 cuenta al lado';
+function ordenarHojaGastosSiFalta_() {
+  if (propiedad_('COLUMNAS_VERSION') === COLUMNAS_VERSION) return;
+  ordenarHojaGastos();
+}
+
+function ordenarHojaGastos() {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var hoja = hojaGastos_();
+    var movida = ordenarColumnasGastos_(hoja);
+    formatoGastos_(hoja);
+    PropertiesService.getScriptProperties().setProperty('COLUMNAS_VERSION', COLUMNAS_VERSION);
+    Logger.log(movida ? 'Listo: la columna Cuenta quedó al lado de Centro de costo.' : 'La hoja Gastos ya estaba ordenada.');
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -584,6 +671,7 @@ function agregarCentro_(nombre) {
 }
 
 function config_() {
+  ordenarHojaGastosSiFalta_();
   reordenarSiFalta_();
   agregarCuentasFaltantes_();
   moverGastosAntiguosSiFalta_();
@@ -702,8 +790,7 @@ function moverGastosAntiguos() {
         if (oficial[sinTildes_(d[0])]) destinoDe[k] = [oficial[sinTildes_(d[0])], d[1]];
       });
 
-      var rango = gastos.getRange(2, 1, n, COLUMNAS_GASTOS.length);
-      var filas = rango.getValues();
+      var filas = leerGastos_(gastos);
       filas.forEach(function (f) {
         if (!f[0] && !f[3]) return;
         var centro = String(f[2]).trim(), cuenta = String(f[7] || '').trim();
@@ -733,7 +820,7 @@ function moverGastosAntiguos() {
       if (claves.length) {
         var tz = ss.getSpreadsheetTimeZone();
         gastos.copyTo(ss).setName('Gastos respaldo ' + Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd HH.mm.ss')).hideSheet();
-        rango.setValues(filas);
+        guardarCentroYCuenta_(gastos, filas);
         actualizarResumenes_(ss);
       }
     }
@@ -814,7 +901,7 @@ function agregarGasto_(body) {
   try {
     var hoja = hojaGastos_();
     asegurarColumnaCuenta_(hoja);
-    hoja.appendRow([Utilities.getUuid(), fecha, centro, monto, descripcion, persona, new Date(), cuenta]);
+    hoja.appendRow(filaFisicaGastos_(hoja, [Utilities.getUuid(), fecha, centro, monto, descripcion, persona, new Date(), cuenta]));
   } finally {
     lock.releaseLock();
   }
@@ -847,7 +934,7 @@ function ultimosGastos_() {
   if (ultima < 2) return [];
   var n = Math.min(ULTIMOS_GASTOS, ultima - 1);
   var tz = libro_().getSpreadsheetTimeZone();
-  return hoja.getRange(ultima - n + 1, 1, n, COLUMNAS_GASTOS.length).getValues()
+  return leerGastos_(hoja, ultima - n + 1, n)
     .reverse()
     .map(function (f) {
       return {
@@ -868,9 +955,9 @@ function totalMesActual_() {
   if (ultima < 2) return 0;
   var tz = libro_().getSpreadsheetTimeZone();
   var mesActual = Utilities.formatDate(new Date(), tz, 'yyyy-MM');
-  return hoja.getRange(2, 2, ultima - 1, 3).getValues().reduce(function (suma, f) {
-    if (f[0] instanceof Date && Utilities.formatDate(f[0], tz, 'yyyy-MM') === mesActual) {
-      return suma + (Number(f[2]) || 0);
+  return leerGastos_(hoja).reduce(function (suma, f) {
+    if (f[1] instanceof Date && Utilities.formatDate(f[1], tz, 'yyyy-MM') === mesActual) {
+      return suma + (Number(f[3]) || 0);
     }
     return suma;
   }, 0);
@@ -884,7 +971,7 @@ function gastosDeCentro_(centro, periodo) {
   var hoja = hojaGastos_();
   if (hoja.getLastRow() < 2) return [];
   var tz = libro_().getSpreadsheetTimeZone();
-  return hoja.getRange(2, 1, hoja.getLastRow() - 1, COLUMNAS_GASTOS.length).getValues()
+  return leerGastos_(hoja)
     .filter(function (f) {
       return f[1] instanceof Date && String(f[2]).trim() === centro &&
         Utilities.formatDate(f[1], tz, 'yyyy-MM').slice(0, periodo.length) === periodo;
