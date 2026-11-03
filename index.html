@@ -325,6 +325,8 @@
       .tabs, .subtabs, .bio-invita { max-width: 560px; margin-left: auto; margin-right: auto; }
       #login, #bloqueo { max-width: 480px; margin: 0 auto; }
     }
+    .lista.revisar li { display: block; }
+    .lista.revisar .motivo { color: var(--danger); font-size: 14px; margin-top: 2px; }
     .bio-invita { display: flex; align-items: center; gap: 12px; }
     .bio-invita .ico { font-size: 28px; }
     .bio-invita .txt { flex: 1; min-width: 0; font-size: 15px; }
@@ -470,6 +472,20 @@
       <section class="card">
         <h2>Centros de costo</h2>
         <ul class="leyenda" id="leyenda"></ul>
+      </section>
+      <section class="card">
+        <div class="fila">
+          <div>
+            <div>Revisar planilla</div>
+            <div class="total">Busca gastos con centro, cuenta, fecha o monto mal puestos.</div>
+          </div>
+          <button class="btn-sec" id="revisar" type="button">Revisar</button>
+        </div>
+        <div id="revisar-res" hidden>
+          <div class="total" id="revisar-txt" style="margin-top:12px"></div>
+          <ul class="lista revisar" id="revisar-lista"></ul>
+          <a class="link" id="revisar-abrir" target="_blank" rel="noopener" hidden>Abrir la planilla para corregir ↗</a>
+        </div>
       </section>
     </div>
 
@@ -1119,6 +1135,51 @@
     ul.innerHTML = '<li class="vacio"></li>';
     ul.firstChild.textContent = texto;
   }
+
+  // ---------- Revisar planilla ----------
+  $('revisar').addEventListener('click', function () {
+    var boton = this;
+    boton.disabled = true;
+    boton.textContent = 'Revisando…';
+    $('revisar-res').hidden = false;
+    $('revisar-txt').textContent = '';
+    $('revisar-lista').innerHTML = '';
+    $('revisar-abrir').hidden = true;
+    api('revisar').then(function (res) {
+      var p = res.problemas || [];
+      $('revisar-txt').textContent = p.length
+        ? p.length + (p.length === 1 ? ' fila para revisar' : ' filas para revisar') + ' en la hoja Gastos:'
+        : '✓ Todo bien: no hay filas con problemas.';
+      p.forEach(function (x) {
+        var li = document.createElement('li');
+        var l1 = document.createElement('div');
+        l1.className = 'linea1';
+        var izq = document.createElement('span');
+        izq.textContent = 'Fila ' + x.fila + ' · ' + (x.centro || 'sin centro') + (x.cuenta ? ' / ' + x.cuenta : '');
+        var der = document.createElement('span');
+        der.textContent = x.monto ? clp.format(x.monto) : '';
+        l1.append(izq, der);
+        var l2 = document.createElement('div');
+        l2.className = 'linea2';
+        l2.textContent = [x.fecha, x.persona, x.descripcion].filter(Boolean).join(' · ');
+        var m = document.createElement('div');
+        m.className = 'motivo';
+        m.textContent = x.motivos.join(' · ');
+        li.append(l1, l2, m);
+        $('revisar-lista').appendChild(li);
+      });
+      if (p.length && res.url) {
+        $('revisar-abrir').href = res.url;
+        $('revisar-abrir').hidden = false;
+      }
+    }).catch(function (err) {
+      if (esErrorDeAcceso(err)) return cerrarSesion();
+      $('revisar-txt').textContent = 'No se pudo revisar: ' + err.message;
+    }).then(function () {
+      boton.disabled = false;
+      boton.textContent = 'Revisar';
+    });
+  });
 
   function soloNumero(el) { return Number(el.value.replace(/\D/g, '')) || 0; }
 
