@@ -40,12 +40,13 @@ var CENTROS_RENOMBRADOS = { 'Nana': 'Vicky' };
 var ULTIMOS_GASTOS = 20;
 var COLUMNAS_RENDICIONES = ['ID', 'Fecha', 'Monto', 'Descripción', 'Comprobante', 'Estado', 'Correo', 'Registró', 'Creado'];
 var COLUMNAS_AZUCAR = ['Fecha', 'Evento', 'Creado'];
-var COLUMNAS_PROTEINA = ['ID', 'Fecha', 'Gramos', 'Alimento', 'Creado'];
+// Un registro por persona y día. Las filas viejas (una por comida, sin Persona) son de Fran.
+var COLUMNAS_PROTEINA = ['ID', 'Fecha', 'Gramos', 'Nota', 'Creado', 'Persona'];
 var CARPETA_RENDICIONES = 'Rendiciones - comprobantes';
 var META_PROTEINA_INICIAL = 100;
 var ULTIMAS_RENDICIONES = 50;
 // Se muestra al abrir la URL /exec: sirve para comprobar que Google tiene el código nuevo.
-var VERSION = '2026-11-03 · botón Revisar planilla';
+var VERSION = '2026-11-04 · proteína diaria con nota';
 
 // ---------------------------------------------------------------------------
 // Instalación: ejecutar una vez desde el editor (botón "Ejecutar" con setup).
@@ -642,15 +643,19 @@ function doPost(e) {
       case 'azucarDeshacer':
         deshacerEventoAzucar_();
         return json_(Object.assign({ ok: true }, datosSalud_()));
-      case 'proteinaAdd':
-        agregarProteina_(body);
-        return json_(Object.assign({ ok: true }, datosSalud_()));
-      case 'proteinaDelete':
-        borrarFilaPorId_(hoja_(HOJA_PROTEINA, COLUMNAS_PROTEINA), body.id);
-        return json_(Object.assign({ ok: true }, datosSalud_()));
+
+      // Proteína diaria: el mismo registro para Fran (Salud) y Vicente (Deporte), por persona.
+      case 'proteina':
+        return json_(Object.assign({ ok: true }, datosProteina_(body.persona)));
+      case 'proteinaGuardar':
+        guardarProteina_(body);
+        return json_(Object.assign({ ok: true }, datosProteina_(body.persona)));
+      case 'proteinaBorrar':
+        borrarProteinaDia_(body.persona, body.fecha);
+        return json_(Object.assign({ ok: true }, datosProteina_(body.persona)));
       case 'proteinaMeta':
-        cambiarMetaProteina_(body.meta);
-        return json_(Object.assign({ ok: true }, datosSalud_()));
+        cambiarMetaProteina_(body.persona, body.meta);
+        return json_(Object.assign({ ok: true }, datosProteina_(body.persona)));
       default:
         throw new Error('Acción desconocida');
     }
@@ -1258,7 +1263,7 @@ function borrarRendicion_(id) {
 }
 
 // ---------------------------------------------------------------------------
-// Salud: contador de días sin azúcar y proteína diaria.
+// Salud: contador de días sin azúcar.
 // ---------------------------------------------------------------------------
 
 function datosSalud_() {
@@ -1268,34 +1273,7 @@ function datosSalud_() {
     .filter(function (f) { return f[0] instanceof Date; })
     .map(function (f) { return { fecha: Utilities.formatDate(f[0], tz, 'yyyy-MM-dd'), evento: String(f[1]) }; });
 
-  var hojaP = hoja_(HOJA_PROTEINA, COLUMNAS_PROTEINA);
-  var filas = hojaP.getLastRow() < 2 ? [] : hojaP.getRange(2, 1, hojaP.getLastRow() - 1, 4).getValues()
-    .filter(function (f) { return f[0] && f[1] instanceof Date; })
-    .map(function (f) {
-      return { id: f[0], fecha: Utilities.formatDate(f[1], tz, 'yyyy-MM-dd'), gramos: Number(f[2]) || 0, alimento: String(f[3]) };
-    });
-  var desde = new Date();
-  desde.setDate(desde.getDate() - 35);
-  desde = Utilities.formatDate(desde, tz, 'yyyy-MM-dd');
-
-  // Alimentos más usados (con sus últimos gramos) para agregarlos de un toque.
-  var usados = {};
-  filas.slice(-300).forEach(function (f) {
-    var k = f.alimento.toLowerCase();
-    if (!k) return;
-    usados[k] = { alimento: f.alimento, gramos: f.gramos, veces: ((usados[k] || {}).veces || 0) + 1 };
-  });
-  var frecuentes = Object.keys(usados).map(function (k) { return usados[k]; })
-    .sort(function (a, b) { return b.veces - a.veces; }).slice(0, 8);
-
-  return {
-    azucar: { eventos: eventos },
-    proteina: {
-      meta: Number(PropertiesService.getScriptProperties().getProperty('PROTEINA_META')) || META_PROTEINA_INICIAL,
-      registros: filas.filter(function (f) { return f.fecha >= desde; }),
-      frecuentes: frecuentes
-    }
-  };
+  return { azucar: { eventos: eventos } };
 }
 
 function agregarEventoAzucar_(evento, fecha) {
@@ -1310,18 +1288,107 @@ function deshacerEventoAzucar_() {
   hoja.deleteRow(hoja.getLastRow());
 }
 
-function agregarProteina_(body) {
-  var gramos = Math.round(Number(body.gramos));
-  var alimento = String(body.alimento || '').replace(/\s+/g, ' ').trim().slice(0, 60);
-  if (!(gramos > 0 && gramos <= 500)) throw new Error('Gramos inválidos');
-  if (!alimento) throw new Error('Escribe qué comiste');
-  hoja_(HOJA_PROTEINA, COLUMNAS_PROTEINA).appendRow([Utilities.getUuid(), parsearFecha_(body.fecha), gramos, alimento, new Date()]);
+// ---------------------------------------------------------------------------
+// Proteína diaria: un total de gramos por día + una nota opcional ("base de huevos,
+// comí azúcar, me sentí bien…"). Es por persona; Fran y Vicente usan lo mismo.
+// ---------------------------------------------------------------------------
+
+function personaProteina_(persona) {
+  persona = String(persona || '').trim();
+  if (leerLista_(HOJA_PERSONAS).indexOf(persona) === -1) throw new Error('Persona inválida');
+  return persona;
 }
 
-function cambiarMetaProteina_(meta) {
+// Hoja Proteína al formato nuevo: "Alimento" pasa a "Nota" y se agrega "Persona".
+function hojaProteina_() {
+  var hoja = hoja_(HOJA_PROTEINA, COLUMNAS_PROTEINA);
+  var enc = hoja.getRange(1, 1, 1, COLUMNAS_PROTEINA.length).getValues()[0];
+  COLUMNAS_PROTEINA.forEach(function (c, i) {
+    if (String(enc[i]) !== c) hoja.getRange(1, i + 1).setValue(c).setFontWeight('bold');
+  });
+  return hoja;
+}
+
+function filasProteina_(hoja, persona) {
+  var tz = libro_().getSpreadsheetTimeZone();
+  if (hoja.getLastRow() < 2) return [];
+  return hoja.getRange(2, 1, hoja.getLastRow() - 1, COLUMNAS_PROTEINA.length).getValues()
+    .map(function (f, i) {
+      return {
+        fila: i + 2,
+        fecha: f[1] instanceof Date ? Utilities.formatDate(f[1], tz, 'yyyy-MM-dd') : '',
+        gramos: Number(f[2]) || 0,
+        nota: String(f[3] || '').trim(),
+        persona: String(f[5] || '').trim() || 'Fran'
+      };
+    })
+    .filter(function (f) { return f.fecha && f.persona === persona; });
+}
+
+function datosProteina_(persona) {
+  persona = personaProteina_(persona);
+  // Junta por día (los días antiguos pueden tener varias filas, una por comida).
+  var dias = {};
+  filasProteina_(hojaProteina_(), persona).forEach(function (f) {
+    var d = dias[f.fecha] = dias[f.fecha] || { fecha: f.fecha, gramos: 0, notas: [] };
+    d.gramos += f.gramos;
+    if (f.nota) d.notas.push(f.nota);
+  });
+  var registros = Object.keys(dias).sort().reverse().slice(0, 120).map(function (k) {
+    var d = dias[k];
+    return { fecha: d.fecha, gramos: d.gramos, nota: d.notas.join(' · ') };
+  });
+  return { persona: persona, meta: metaProteina_(persona), registros: registros };
+}
+
+function guardarProteina_(body) {
+  var persona = personaProteina_(body.persona);
+  var gramos = Math.round(Number(body.gramos));
+  var nota = String(body.nota || '').replace(/[ \t]+/g, ' ').trim().slice(0, 500);
+  if (!(gramos >= 0 && gramos <= 1000)) throw new Error('Gramos inválidos');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.fecha || ''))) throw new Error('Fecha inválida');
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var hoja = hojaProteina_();
+    borrarFilasProteina_(hoja, persona, body.fecha);
+    hoja.appendRow([Utilities.getUuid(), parsearFecha_(body.fecha), gramos, nota, new Date(), persona]);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function borrarProteinaDia_(persona, fecha) {
+  persona = personaProteina_(persona);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    borrarFilasProteina_(hojaProteina_(), persona, String(fecha || ''));
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function borrarFilasProteina_(hoja, persona, fecha) {
+  filasProteina_(hoja, persona)
+    .filter(function (f) { return f.fecha === fecha; })
+    .reverse()
+    .forEach(function (f) { hoja.deleteRow(f.fila); });
+}
+
+function metaProteina_(persona) {
+  var props = PropertiesService.getScriptProperties();
+  var meta = Number(props.getProperty('PROTEINA_META_' + persona));
+  // La meta antigua (sin persona) era la de Fran.
+  if (!meta && persona === 'Fran') meta = Number(props.getProperty('PROTEINA_META'));
+  return meta || META_PROTEINA_INICIAL;
+}
+
+function cambiarMetaProteina_(persona, meta) {
+  persona = personaProteina_(persona);
   meta = Math.round(Number(meta));
   if (!(meta >= 10 && meta <= 500)) throw new Error('Meta inválida');
-  PropertiesService.getScriptProperties().setProperty('PROTEINA_META', String(meta));
+  PropertiesService.getScriptProperties().setProperty('PROTEINA_META_' + persona, String(meta));
 }
 
 // ---------------------------------------------------------------------------
