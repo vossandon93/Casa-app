@@ -13,7 +13,7 @@
  *   agrega una hoja o una columna, igual queda con el estilo general.
  */
 
-var FORMATO_VERSION = '2026-11-04 v1';
+var FORMATO_VERSION = '2026-11-04 v2';
 
 var ESTILO = {
   fuente: 'Arial',
@@ -35,12 +35,14 @@ var COLOR_PESTANA = {
   'Resumen mensual': '#2E7D5B', 'Resumen anual': '#2E7D5B', 'Resumen por cuenta': '#2E7D5B',
   'Centros': '#9AA5B1', 'Cuentas': '#9AA5B1', 'Personas': '#9AA5B1',
   'Rendiciones': '#B7791F',
-  'Azúcar': '#8E5AA8', 'Proteína': '#8E5AA8'
+  'Azúcar': '#8E5AA8', 'Proteína': '#8E5AA8',
+  'Entrenamientos': '#C0504D', 'Diario Vicente': '#C0504D'
 };
 
 // Orden de las pestañas (las que no están aquí quedan al final, como estén).
 var ORDEN_PESTANAS = ['Gastos', 'Resumen mensual', 'Resumen anual', 'Resumen por cuenta',
-  'Centros', 'Cuentas', 'Personas', 'Rendiciones', 'Azúcar', 'Proteína'];
+  'Centros', 'Cuentas', 'Personas', 'Rendiciones', 'Azúcar', 'Proteína',
+  'Entrenamientos', 'Diario Vicente'];
 
 // El espacio al final separa el monto de la columna siguiente.
 var FMT_PESOS = '$#,##0" ";-$#,##0" "';
@@ -64,6 +66,15 @@ var COLUMNAS_ESTILO = {
   'Evento': { ancho: 160 },
   'Gramos': { ancho: 80, formato: '0', alinear: 'right' },
   'Alimento': { ancho: 200 },
+  'Nota': { ancho: 240, ajustar: true },
+  'Categorías': { ancho: 160 },
+  'Minutos': { ancho: 80, formato: '0', alinear: 'right' },
+  'Ejercicios': { ancho: 280, ajustar: true },
+  'Cigarros': { ancho: 85, formato: '0', alinear: 'right' },
+  'Comida': { ancho: 240, ajustar: true },
+  'Etiquetas': { ancho: 160 },
+  'Peso (kg)': { ancho: 85, formato: '0.0', alinear: 'right' },
+  'Actualizado': { ancho: 125, formato: 'dd/mm/yyyy hh:mm', alinear: 'center', suave: true },
   'Año': { ancho: 60, formato: '0', alinear: 'center' },
   'Mes': { ancho: 55, formato: '00', alinear: 'center' }
 };
@@ -157,7 +168,7 @@ function estiloTabla_(hoja, filaEnc) {
   bandas_(hoja, hoja.getRange(filaEnc, 1, nDatos + 1, nCols));
 
   // Filtro en el encabezado (solo en hojas de datos, si no tiene uno).
-  if (['Gastos', 'Rendiciones', 'Proteína'].indexOf(hoja.getName()) !== -1 && !hoja.getFilter()) {
+  if (['Gastos', 'Rendiciones', 'Proteína', 'Entrenamientos'].indexOf(hoja.getName()) !== -1 && !hoja.getFilter()) {
     hoja.getRange(filaEnc, 1, Math.max(hoja.getLastRow() - filaEnc + 1, 2), nCols).createFilter();
   }
 
