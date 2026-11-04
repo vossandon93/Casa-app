@@ -138,6 +138,17 @@ Para activarlas (una sola vez):
 
 > Qué pestañas ve cada uno se define en `index.html`, en `PESTANAS_DE`. Ojo: es una separación de comodidad, no de seguridad; los dos usan el mismo PIN.
 
+## Formato de la planilla (que se vea limpia)
+
+El diseño (encabezados azul oscuro, filas alternadas, anchos de columna, montos con `$`, ceros como "–" en los resúmenes, colores de pestaña) vive en un archivo aparte: [`apps-script/Formato.gs`](apps-script/Formato.gs). Solo cambia la apariencia, nunca los datos.
+
+1. En Apps Script, junto a **Archivos**, presiona **+ → Secuencia de comandos** y llámalo `Formato`.
+2. Pega el contenido completo de `apps-script/Formato.gs` y guarda.
+3. Elige la función **darFormato** y presiona **Ejecutar** (o simplemente abre la app: lo aplica sola una vez).
+4. **Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.**
+
+Los resúmenes se reescriben con cada gasto y quedan con el formato solos. Si se agrega una hoja o una columna nueva, vuelve a ejecutar **darFormato** (para que se aplique solo en todos lados, sube `FORMATO_VERSION` en `Formato.gs`). Si no pegas este archivo, la app funciona igual, solo que sin el diseño.
+
 ## Si cambias el script más adelante
 
 Pega el nuevo código y ve a **Implementar → Gestionar implementaciones → ✏️ editar → Versión: Nueva versión → Implementar**. Así la URL se mantiene y no hay que tocar `config.js`.

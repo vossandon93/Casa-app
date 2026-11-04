@@ -132,6 +132,8 @@ function setup() {
     ss.deleteSheet(hoja1);
   }
 
+  if (typeof darFormato === 'function') darFormato();   // Formato.gs
+
   if (!PropertiesService.getScriptProperties().getProperty('PIN')) {
     Logger.log('Falta definir el PIN en Configuración del proyecto > Propiedades del script.');
   }
@@ -157,6 +159,7 @@ function prepararHoja_(ss, nombre, columnas) {
   });
   hoja.getRange(1, 1, 1, columnas.length).setNumberFormat('@');
   if (columnas[0] === 'ID') hoja.hideColumns(1);
+  if (typeof estiloHoja_ === 'function') estiloHoja_(hoja);   // Formato.gs
   return hoja;
 }
 
@@ -329,6 +332,7 @@ function escribirResumen_(hoja, titulo, tabla, primeraColMonto) {
     hoja.getRange('A3').setValue('Sin gastos todavía');
   }
   hoja.setFrozenRows(2);
+  if (typeof estiloResumen_ === 'function') estiloResumen_(hoja, primeraColMonto);   // Formato.gs
 }
 
 // Suma de montos agrupada por mes (yyyy-MM), centro, cuenta y persona.
@@ -853,6 +857,7 @@ function config_() {
   agregarCuentasFaltantes_();
   moverGastosAntiguosSiFalta_();
   listasGastosSiFalta_();
+  if (typeof formatoSiFalta_ === 'function') formatoSiFalta_();   // Formato.gs
   var cuentas = leerCuentas_();
   Object.keys(cuentas).forEach(function (c) { cuentas[c] = alfabetico_(cuentas[c]); });
   return { ok: true, centros: alfabetico_(leerLista_(HOJA_CENTROS)), personas: leerLista_(HOJA_PERSONAS), cuentas: cuentas };
