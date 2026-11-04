@@ -18,6 +18,8 @@ var HOJA_RESUMEN_CUENTAS = 'Resumen por cuenta';
 var HOJA_RENDICIONES = 'Rendiciones';
 var HOJA_AZUCAR = 'Azúcar';
 var HOJA_PROTEINA = 'Proteína';
+var HOJA_ENTRENOS = 'Entrenamientos';
+var HOJA_DIARIO = 'Diario Vicente';
 
 // Orden lógico que usa el código (f[0]..f[7]). En la hoja las columnas se buscan por
 // su encabezado, así que pueden estar en otro orden (ORDEN_HOJA_GASTOS).
@@ -43,9 +45,18 @@ var COLUMNAS_AZUCAR = ['Fecha', 'Evento', 'Creado'];
 var COLUMNAS_PROTEINA = ['ID', 'Fecha', 'Gramos', 'Alimento', 'Creado'];
 var CARPETA_RENDICIONES = 'Rendiciones - comprobantes';
 var META_PROTEINA_INICIAL = 100;
+// Deporte (pestaña de Vicente): entrenamientos y diario de proteína, comida y cigarros.
+var COLUMNAS_ENTRENOS = ['ID', 'Fecha', 'Categorías', 'Minutos', 'Ejercicios', 'Nota', 'Creado'];
+var COLUMNAS_DIARIO = ['Fecha', 'Proteína (g)', 'Cigarros', 'Comida', 'Etiquetas', 'Peso (kg)', 'Actualizado'];
+var CATEGORIAS_DEPORTE = ['Upper', 'Lower', 'Core', 'Cardio', 'Full body', 'Movilidad'];
+var METAS_DEPORTE = {
+  semana: { prop: 'DEPORTE_META_SEMANA', inicial: 4, min: 1, max: 7 },
+  proteina: { prop: 'DEPORTE_META_PROTEINA', inicial: 130, min: 30, max: 400 },
+  peso: { prop: 'DEPORTE_META_PESO', inicial: 76, min: 30, max: 200 }
+};
 var ULTIMAS_RENDICIONES = 50;
 // Se muestra al abrir la URL /exec: sirve para comprobar que Google tiene el código nuevo.
-var VERSION = '2026-11-03 · botón Revisar planilla';
+var VERSION = '2026-11-04 · pestaña Deporte';
 
 // ---------------------------------------------------------------------------
 // Instalación: ejecutar una vez desde el editor (botón "Ejecutar" con setup).
@@ -108,6 +119,8 @@ function setup() {
   prepararHoja_(ss, HOJA_RENDICIONES, COLUMNAS_RENDICIONES);
   prepararHoja_(ss, HOJA_AZUCAR, COLUMNAS_AZUCAR);
   prepararHoja_(ss, HOJA_PROTEINA, COLUMNAS_PROTEINA);
+  prepararHoja_(ss, HOJA_ENTRENOS, COLUMNAS_ENTRENOS);
+  prepararHoja_(ss, HOJA_DIARIO, COLUMNAS_DIARIO);
 
   // Pide (una vez) los permisos de Drive y Gmail que usan las rendiciones.
   carpetaRendiciones_();
@@ -651,6 +664,28 @@ function doPost(e) {
       case 'proteinaMeta':
         cambiarMetaProteina_(body.meta);
         return json_(Object.assign({ ok: true }, datosSalud_()));
+
+      // Deporte (pestaña de Vicente): entrenamientos + diario de proteína, comida y cigarros
+      case 'deporte':
+        return json_(Object.assign({ ok: true }, datosDeporte_()));
+      case 'entrenoAdd':
+        agregarEntreno_(body);
+        return json_(Object.assign({ ok: true }, datosDeporte_()));
+      case 'entrenoDelete':
+        borrarFilaPorId_(hoja_(HOJA_ENTRENOS, COLUMNAS_ENTRENOS), body.id);
+        return json_(Object.assign({ ok: true }, datosDeporte_()));
+      case 'diarioSumar':
+        sumarDiario_(body);
+        return json_(Object.assign({ ok: true }, datosDeporte_()));
+      case 'diarioGuardar':
+        guardarDiario_(body);
+        return json_(Object.assign({ ok: true }, datosDeporte_()));
+      case 'deporteMeta':
+        cambiarMetaDeporte_(body.clave, body.valor);
+        return json_(Object.assign({ ok: true }, datosDeporte_()));
+      case 'deporteOcultar':
+        ocultarEjercicio_(body.id, body.ocultar);
+        return json_(Object.assign({ ok: true }, datosDeporte_()));
       default:
         throw new Error('Acción desconocida');
     }
@@ -1322,6 +1357,179 @@ function cambiarMetaProteina_(meta) {
   meta = Math.round(Number(meta));
   if (!(meta >= 10 && meta <= 500)) throw new Error('Meta inválida');
   PropertiesService.getScriptProperties().setProperty('PROTEINA_META', String(meta));
+}
+
+// ---------------------------------------------------------------------------
+// Deporte (Vicente): registro de entrenamientos y diario.
+// - Entrenamientos: una fila por sesión. Los ejercicios van en una celda, uno por
+//   línea, como "Nombre — detalle" (ej. "Dominadas — 4x6").
+// - Diario Vicente: una fila por día con proteína total, cigarros, comida y peso.
+// ---------------------------------------------------------------------------
+var DIAS_ENTRENOS = 400;
+var DIAS_DIARIO = 60;
+
+function datosDeporte_() {
+  var tz = libro_().getSpreadsheetTimeZone();
+  var desdeE = Utilities.formatDate(new Date(Date.now() - DIAS_ENTRENOS * 864e5), tz, 'yyyy-MM-dd');
+  var desdeD = Utilities.formatDate(new Date(Date.now() - DIAS_DIARIO * 864e5), tz, 'yyyy-MM-dd');
+
+  var hojaE = hoja_(HOJA_ENTRENOS, COLUMNAS_ENTRENOS);
+  var sesiones = hojaE.getLastRow() < 2 ? [] : hojaE.getRange(2, 1, hojaE.getLastRow() - 1, 6).getValues()
+    .filter(function (f) { return f[0] && f[1] instanceof Date; })
+    .map(function (f) {
+      return {
+        id: f[0],
+        fecha: Utilities.formatDate(f[1], tz, 'yyyy-MM-dd'),
+        categorias: String(f[2]).split(',').map(function (c) { return c.trim(); }).filter(function (c) { return c; }),
+        minutos: Number(f[3]) || 0,
+        ejercicios: String(f[4]).split('\n').map(function (l) {
+          var i = l.indexOf(' — ');
+          return i === -1 ? { nombre: l.trim(), detalle: '' } : { nombre: l.slice(0, i).trim(), detalle: l.slice(i + 3).trim() };
+        }).filter(function (e) { return e.nombre; }),
+        nota: String(f[5] || '')
+      };
+    })
+    .filter(function (s) { return s.fecha >= desdeE; });
+  sesiones.sort(function (a, b) { return a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0; });
+
+  var hojaD = hoja_(HOJA_DIARIO, COLUMNAS_DIARIO);
+  var filas = hojaD.getLastRow() < 2 ? [] : hojaD.getRange(2, 1, hojaD.getLastRow() - 1, 6).getValues()
+    .filter(function (f) { return f[0] instanceof Date; })
+    .map(function (f) {
+      return {
+        fecha: Utilities.formatDate(f[0], tz, 'yyyy-MM-dd'),
+        proteina: Number(f[1]) || 0,
+        cigarros: Number(f[2]) || 0,
+        comida: String(f[3] || ''),
+        etiquetas: String(f[4] || '').split(',').map(function (c) { return c.trim(); }).filter(function (c) { return c; }),
+        peso: f[5] === '' || f[5] === null ? null : Number(f[5]) || null
+      };
+    });
+  filas.sort(function (a, b) { return a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0; });
+  var pesos = filas.filter(function (f) { return f.peso; }).map(function (f) { return { fecha: f.fecha, peso: f.peso }; });
+
+  var props = PropertiesService.getScriptProperties();
+  var metas = {};
+  Object.keys(METAS_DEPORTE).forEach(function (k) {
+    metas[k] = Number(props.getProperty(METAS_DEPORTE[k].prop)) || METAS_DEPORTE[k].inicial;
+  });
+  var ocultos = [];
+  try { ocultos = JSON.parse(props.getProperty('DEPORTE_OCULTOS') || '[]'); } catch (e) {}
+
+  return {
+    sesiones: sesiones,
+    diario: filas.filter(function (f) { return f.fecha >= desdeD; }),
+    pesos: pesos.slice(-30),
+    metas: metas,
+    ocultos: ocultos
+  };
+}
+
+function agregarEntreno_(body) {
+  var categorias = (body.categorias || []).filter(function (c) { return CATEGORIAS_DEPORTE.indexOf(c) !== -1; });
+  if (!categorias.length) throw new Error('Elige al menos una categoría');
+  var minutos = Math.round(Number(body.minutos) || 0);
+  if (minutos < 0 || minutos > 600) throw new Error('Minutos inválidos');
+  var limpiar = function (t, n) { return String(t || '').replace(/\s+/g, ' ').trim().replace(/^[=+\-@]+/, '').slice(0, n); };
+  var ejercicios = (body.ejercicios || []).slice(0, 40).map(function (e) {
+    var nombre = limpiar(e && e.nombre, 60).replace(/ — /g, ' - ');
+    var detalle = limpiar(e && e.detalle, 60);
+    return nombre ? nombre + (detalle ? ' — ' + detalle : '') : '';
+  }).filter(function (l) { return l; });
+  var nota = limpiar(body.nota, 300);
+  hoja_(HOJA_ENTRENOS, COLUMNAS_ENTRENOS).appendRow([
+    Utilities.getUuid(), parsearFecha_(body.fecha), categorias.join(', '), minutos || '', ejercicios.join('\n'), nota, new Date()
+  ]);
+}
+
+// Devuelve el número de fila del día (o 0 si no existe).
+function filaDiario_(hoja, fecha, tz) {
+  var buscada = Utilities.formatDate(fecha, tz, 'yyyy-MM-dd');
+  var ultima = hoja.getLastRow();
+  if (ultima < 2) return 0;
+  var fechas = hoja.getRange(2, 1, ultima - 1, 1).getValues();
+  for (var i = fechas.length - 1; i >= 0; i--) {
+    if (fechas[i][0] instanceof Date && Utilities.formatDate(fechas[i][0], tz, 'yyyy-MM-dd') === buscada) return i + 2;
+  }
+  return 0;
+}
+
+// Cambia los campos de un día (crea la fila si no existe). cambios: { columna (1-based): fn(valorActual) }.
+function editarDiario_(fechaTexto, cambios) {
+  var tz = libro_().getSpreadsheetTimeZone();
+  var fecha = parsearFecha_(fechaTexto);
+  var hoja = hoja_(HOJA_DIARIO, COLUMNAS_DIARIO);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var fila = filaDiario_(hoja, fecha, tz);
+    var valores = fila ? hoja.getRange(fila, 1, 1, COLUMNAS_DIARIO.length).getValues()[0] : [fecha, '', '', '', '', '', ''];
+    Object.keys(cambios).forEach(function (col) { valores[col - 1] = cambios[col](valores[col - 1]); });
+    valores[6] = new Date();
+    if (fila) hoja.getRange(fila, 1, 1, valores.length).setValues([valores]);
+    else hoja.appendRow(valores);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+var CAMPOS_DIARIO = { proteina: { col: 2, max: 600 }, cigarros: { col: 3, max: 200 } };
+
+function sumarDiario_(body) {
+  var c = CAMPOS_DIARIO[body.campo];
+  var n = Math.round(Number(body.n));
+  if (!c) throw new Error('Campo inválido');
+  if (!n || Math.abs(n) > c.max) throw new Error('Cantidad inválida');
+  var cambios = {};
+  cambios[c.col] = function (v) { return Math.min(c.max, Math.max(0, (Number(v) || 0) + n)); };
+  editarDiario_(body.fecha, cambios);
+}
+
+// Solo cambia los campos que vienen: proteina, cigarros, comida, etiquetas, peso.
+function guardarDiario_(body) {
+  var cambios = {};
+  Object.keys(CAMPOS_DIARIO).forEach(function (k) {
+    if (!(k in body)) return;
+    var n = Math.round(Number(body[k]));
+    if (!(n >= 0 && n <= CAMPOS_DIARIO[k].max)) throw new Error('Cantidad inválida');
+    cambios[CAMPOS_DIARIO[k].col] = function () { return n; };
+  });
+  if ('comida' in body) {
+    var comida = String(body.comida || '').replace(/\s+/g, ' ').trim().replace(/^[=+\-@]+/, '').slice(0, 300);
+    cambios[4] = function () { return comida; };
+  }
+  if ('etiquetas' in body) {
+    var etiquetas = (body.etiquetas || []).map(function (t) { return String(t).replace(/,/g, ' ').trim().slice(0, 30); })
+      .filter(function (t) { return t; }).slice(0, 15).join(', ');
+    cambios[5] = function () { return etiquetas; };
+  }
+  if ('peso' in body) {
+    var peso = body.peso === null || body.peso === '' ? '' : Math.round(Number(String(body.peso).replace(',', '.')) * 10) / 10;
+    if (peso !== '' && !(peso >= 30 && peso <= 250)) throw new Error('Peso inválido');
+    cambios[6] = function () { return peso; };
+  }
+  if (!Object.keys(cambios).length) throw new Error('No hay nada que guardar');
+  editarDiario_(body.fecha, cambios);
+}
+
+function cambiarMetaDeporte_(clave, valor) {
+  var m = METAS_DEPORTE[clave];
+  if (!m) throw new Error('Meta inválida');
+  var v = Math.round(Number(String(valor).replace(',', '.')) * 10) / 10;
+  if (!(v >= m.min && v <= m.max)) throw new Error('Meta inválida');
+  PropertiesService.getScriptProperties().setProperty(m.prop, String(v));
+}
+
+// Ejercicios que Vicente no quiere que se le propongan.
+function ocultarEjercicio_(id, ocultar) {
+  id = String(id || '').replace(/[^\w-]/g, '').slice(0, 40);
+  if (!id) throw new Error('Falta el ejercicio');
+  var props = PropertiesService.getScriptProperties();
+  var lista = [];
+  try { lista = JSON.parse(props.getProperty('DEPORTE_OCULTOS') || '[]'); } catch (e) {}
+  lista = lista.filter(function (x) { return x !== id; });
+  if (ocultar) lista.push(id);
+  props.setProperty('DEPORTE_OCULTOS', JSON.stringify(lista.slice(-200)));
 }
 
 // ---------------------------------------------------------------------------
