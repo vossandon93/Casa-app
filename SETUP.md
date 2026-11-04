@@ -138,6 +138,14 @@ Para activarlas (una sola vez):
 
 > Qué pestañas ve cada uno se define en `index.html`, en `PESTANAS_DE`. Ojo: es una separación de comodidad, no de seguridad; los dos usan el mismo PIN.
 
+## Formato de la planilla (que se vea limpia)
+
+El diseño (encabezados azul oscuro, filas alternadas, anchos de columna, montos con `$`, ceros como "–" en los resúmenes, colores y orden de pestañas) está al final de `Code.gs`, en la sección **FORMATO VISUAL**. Solo cambia la apariencia, nunca los datos.
+
+- Se aplica solo la primera vez que se abre la app con una versión nueva (`FORMATO_VERSION`), y los resúmenes quedan con formato cada vez que se reescriben.
+- Para aplicarlo a mano (por ejemplo, después de agregar una hoja o columna): elige la función **darFormato** y presiona **Ejecutar**.
+- Columnas nuevas: agrégalas en `COLUMNAS_ESTILO` (ancho, formato y alineación). Las que no estén ahí igual quedan con el estilo general.
+
 ## Si cambias el script más adelante
 
 Pega el nuevo código y ve a **Implementar → Gestionar implementaciones → ✏️ editar → Versión: Nueva versión → Implementar**. Así la URL se mantiene y no hay que tocar `config.js`.
