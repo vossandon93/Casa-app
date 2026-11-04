@@ -140,14 +140,11 @@ Para activarlas (una sola vez):
 
 ## Formato de la planilla (que se vea limpia)
 
-El diseño (encabezados azul oscuro, filas alternadas, anchos de columna, montos con `$`, ceros como "–" en los resúmenes, colores de pestaña) vive en un archivo aparte: [`apps-script/Formato.gs`](apps-script/Formato.gs). Solo cambia la apariencia, nunca los datos.
+El diseño (encabezados azul oscuro, filas alternadas, anchos de columna, montos con `$`, ceros como "–" en los resúmenes, colores y orden de pestañas) está al final de `Code.gs`, en la sección **FORMATO VISUAL**. Solo cambia la apariencia, nunca los datos.
 
-1. En Apps Script, junto a **Archivos**, presiona **+ → Secuencia de comandos** y llámalo `Formato`.
-2. Pega el contenido completo de `apps-script/Formato.gs` y guarda.
-3. Elige la función **darFormato** y presiona **Ejecutar** (o simplemente abre la app: lo aplica sola una vez).
-4. **Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.**
-
-Los resúmenes se reescriben con cada gasto y quedan con el formato solos. Si se agrega una hoja o una columna nueva, vuelve a ejecutar **darFormato** (para que se aplique solo en todos lados, sube `FORMATO_VERSION` en `Formato.gs`). Si no pegas este archivo, la app funciona igual, solo que sin el diseño.
+- Se aplica solo la primera vez que se abre la app con una versión nueva (`FORMATO_VERSION`), y los resúmenes quedan con formato cada vez que se reescriben.
+- Para aplicarlo a mano (por ejemplo, después de agregar una hoja o columna): elige la función **darFormato** y presiona **Ejecutar**.
+- Columnas nuevas: agrégalas en `COLUMNAS_ESTILO` (ancho, formato y alineación). Las que no estén ahí igual quedan con el estilo general.
 
 ## Si cambias el script más adelante
 
