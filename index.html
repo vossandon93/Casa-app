@@ -289,6 +289,19 @@
     .barras-cont { position: relative; }
     .linea-meta { position: absolute; left: 0; right: 0; border-top: 2px dashed var(--muted); pointer-events: none; }
     .barras i.cumple { background: var(--ok); }
+    /* Proteína diaria (componente compartido) */
+    .prot-cont { display: contents; }
+    .prot-cont textarea {
+      width: 100%; box-sizing: border-box; min-height: 84px; resize: vertical; font: inherit; font-size: 16px;
+      padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--text);
+    }
+    .prot-cont textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+    .prot-cont .chips button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+    .prot-cont .acciones { display: flex; justify-content: center; margin-top: 4px; }
+    .prot-cont .lista li { cursor: pointer; }
+    .prot-cont .lista li.sel .linea1 { color: var(--accent); }
+    .prot-cont .lista .nota { font-size: 14px; color: var(--muted); margin-top: 2px; white-space: pre-line; overflow-wrap: anywhere; }
+    .prot-cont .lista .cumple { color: var(--ok); }
     [data-tema="oscuro"] .card { border-color: transparent; }
     [data-tema="oscuro"] input, [data-tema="oscuro"] select,
     [data-tema="oscuro"] .campo-fecha, [data-tema="oscuro"] .foto-btn { background-color: var(--campo); border-color: transparent; }
@@ -321,7 +334,8 @@
       #pag-rendicion > :first-child, #pag-salud > :first-child { grid-column: 1; grid-row: 1 / span 6; }
       #pag-salud { grid-auto-flow: row dense; }
       #pag-salud > :first-child { grid-row: auto; }
-      #pag-salud > :nth-child(2) { grid-column: 1; }
+      #pag-salud .prot-cont > * { margin: 0; grid-column: 2; }
+      #pag-salud .prot-cont > :first-child { grid-column: 1; }
       .tabs, .subtabs, .bio-invita { max-width: 560px; margin-left: auto; margin-right: auto; }
       #login, #bloqueo { max-width: 480px; margin: 0 auto; }
     }
@@ -545,48 +559,8 @@
         <div id="azucar-msg" class="msg" hidden></div>
       </section>
 
-      <section class="card">
-        <div class="fila">
-          <h2 style="margin:0">Proteína</h2>
-          <button class="link" id="prot-meta" type="button"></button>
-        </div>
-        <div class="total" id="prot-dia"></div>
-        <div class="grande" id="prot-total">—</div>
-        <div class="progreso" id="prot-barra"><i></i></div>
-        <div class="total" id="prot-falta"></div>
-
-        <form id="form-prot" novalidate>
-          <div class="dos">
-            <div>
-              <label for="prot-alimento">Qué comiste</label>
-              <input id="prot-alimento" type="text" maxlength="60" placeholder="Ej: 2 huevos" autocomplete="off">
-            </div>
-            <div>
-              <label for="prot-gramos">Gramos</label>
-              <input id="prot-gramos" type="text" inputmode="numeric" placeholder="0 g" autocomplete="off">
-            </div>
-          </div>
-          <button class="btn" id="prot-guardar" type="submit">Agregar</button>
-        </form>
-        <div class="total" style="margin-top:14px">Un toque para agregar:</div>
-        <div class="chips" id="prot-chips"></div>
-        <div id="prot-msg" class="msg" hidden></div>
-      </section>
-
-      <section class="card">
-        <h2 id="prot-lista-titulo">Hoy</h2>
-        <ul class="lista" id="prot-lista"></ul>
-      </section>
-
-      <section class="card">
-        <h2>Últimos 7 días</h2>
-        <div class="total" id="prot-semana"></div>
-        <div class="barras-cont">
-          <div class="barras" id="prot-barras"></div>
-          <div class="linea-meta" id="prot-linea"></div>
-        </div>
-        <div class="barras-eje" id="prot-eje"></div>
-      </section>
+      <!-- Proteína diaria: componente compartido (montarProteina), también en Deporte de Vicente -->
+      <div class="prot-cont" id="salud-proteina"></div>
     </div>
   </section>
 </main>
@@ -1346,24 +1320,14 @@
     });
   }
 
-  // ---------- Salud: días sin azúcar + proteína diaria ----------
-  var salud = { datos: null, dia: '' };
-  var ALIMENTOS_BASE = [
-    { alimento: 'Huevo', gramos: 6 },
-    { alimento: 'Yogur proteico', gramos: 15 },
-    { alimento: 'Pechuga de pollo 150 g', gramos: 45 },
-    { alimento: 'Atún en lata', gramos: 25 },
-    { alimento: 'Batido de proteína', gramos: 25 },
-    { alimento: 'Vaso de leche', gramos: 8 },
-    { alimento: 'Quesillo 100 g', gramos: 12 },
-    { alimento: 'Carne 150 g', gramos: 40 }
-  ];
+  // ---------- Salud: días sin azúcar (la proteína es el componente montarProteina) ----------
+  var salud = { datos: null };
 
   function diasEntre(a, b) { return Math.round((fechaDe(b) - fechaDe(a)) / 864e5); }
   function sumarDias(iso, n) { var d = fechaDe(iso); d.setDate(d.getDate() + n); return isoDe(d); }
 
   function cargarSalud() {
-    if (!salud.dia) salud.dia = hoy();
+    montarProteina($('salud-proteina'), estado.persona);
     if (salud.datos) pintarSalud();
     else $('azucar').innerHTML = '<div class="vacio">Cargando…</div>';
     api('salud').then(function (res) { salud.datos = res; pintarSalud(); }).catch(function (err) {
@@ -1374,7 +1338,7 @@
 
   function accionSalud(accion, datos, el) {
     if (el) el.disabled = true;
-    var msg = accion.indexOf('proteina') === 0 ? $('prot-msg') : $('azucar-msg');
+    var msg = $('azucar-msg');
     return api(accion, datos).then(function (res) {
       if (el) el.disabled = false;
       salud.datos = res;
@@ -1388,9 +1352,7 @@
 
   function pintarSalud() {
     $('azucar-msg').hidden = true;
-    $('prot-msg').hidden = true;
     pintarAzucar();
-    pintarProteina();
   }
 
   // Cada "Comí azúcar" corta la racha; la nueva parte al día siguiente.
@@ -1479,115 +1441,217 @@
     cont.append(racha, grid, notas, comi, atajos);
   }
 
-  function pintarProteina() {
-    var d = salud.datos.proteina;
-    var porDia = {};
-    d.registros.forEach(function (x) { porDia[x.fecha] = (porDia[x.fecha] || 0) + x.gramos; });
-    var dia = salud.dia;
-    var total = porDia[dia] || 0;
-    var esHoy = dia === hoy();
-    var nombreDia = esHoy ? 'Hoy' : dia === haceDias(1) ? 'Ayer' : fechaDe(dia).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
+  // ---------- Proteína diaria (componente compartido) ----------
+  // Un registro por día: total de gramos + una nota opcional de cómo fue el día.
+  // Lo usan Fran (Salud) y Vicente (Deporte): montarProteina(contenedor, persona).
+  // Cambiar algo aquí cambia las dos pestañas; los datos van por persona.
+  var NOTAS_RAPIDAS = ['🥚 Base de huevos', '🍬 Comí azúcar', '😊 Feliz con lo que comí', '👍 Estuvo bueno', '😕 Me costó'];
 
-    $('prot-meta').textContent = 'Meta: ' + d.meta + ' g · cambiar';
-    $('prot-dia').textContent = nombreDia;
-    $('prot-total').textContent = total + ' g';
-    $('prot-barra').querySelector('i').style.width = Math.min(100, total / d.meta * 100) + '%';
-    $('prot-barra').classList.toggle('lista-meta', total >= d.meta);
-    $('prot-falta').textContent = total >= d.meta ? '✓ Meta cumplida 💪' : 'Faltan ' + (d.meta - total) + ' g para la meta';
-    $('prot-guardar').textContent = esHoy ? 'Agregar' : 'Agregar a ' + nombreDia.toLowerCase();
-
-    // Chips: lo que más come Fran, o una lista base mientras no haya historial.
-    var chips = $('prot-chips');
-    chips.innerHTML = '';
-    var lista = d.frecuentes.length >= 3 ? d.frecuentes : d.frecuentes.concat(ALIMENTOS_BASE.filter(function (b) {
-      return !d.frecuentes.some(function (f) { return f.alimento.toLowerCase() === b.alimento.toLowerCase(); });
-    })).slice(0, 8);
-    lista.forEach(function (a) {
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.append(a.alimento + ' ');
-      var g = document.createElement('b'); g.textContent = a.gramos + ' g';
-      b.appendChild(g);
-      b.onclick = function () {
-        accionSalud('proteinaAdd', { alimento: a.alimento, gramos: a.gramos, fecha: salud.dia }, b).catch(function () {});
-      };
-      chips.appendChild(b);
-    });
-
-    // Lista del día elegido
-    $('prot-lista-titulo').textContent = nombreDia;
-    var ul = $('prot-lista');
-    ul.innerHTML = '';
-    var delDia = d.registros.filter(function (x) { return x.fecha === dia; });
-    if (!delDia.length) mensajeLista(ul, 'Nada anotado todavía.');
-    delDia.slice().reverse().forEach(function (x) {
-      var li = document.createElement('li');
-      var info = document.createElement('div'); info.className = 'info';
-      var l1 = document.createElement('div'); l1.className = 'linea1';
-      var a = document.createElement('span'); a.textContent = x.alimento;
-      var g = document.createElement('span'); g.textContent = x.gramos + ' g';
-      l1.append(a, g);
-      info.appendChild(l1);
-      var b = document.createElement('button');
-      b.type = 'button'; b.className = 'borrar'; b.textContent = '✕';
-      b.setAttribute('aria-label', 'Borrar ' + x.alimento);
-      b.onclick = function () { accionSalud('proteinaDelete', { id: x.id }, b).catch(function () {}); };
-      li.append(info, b);
-      ul.appendChild(li);
-    });
-
-    // Últimos 7 días (tocar una barra cambia el día que se ve y donde se anota)
-    var dias = [];
-    for (var i = 6; i >= 0; i--) dias.push(haceDias(i));
-    var max = Math.max.apply(null, dias.map(function (x) { return porDia[x] || 0; }).concat([d.meta * 1.15]));
-    var barras = $('prot-barras'), eje = $('prot-eje');
-    barras.innerHTML = ''; eje.innerHTML = '';
-    var cumplidos = 0;
-    dias.forEach(function (x) {
-      var v = porDia[x] || 0;
-      if (v >= d.meta) cumplidos++;
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.className = x === dia ? 'sel' : '';
-      b.setAttribute('aria-label', fechaCorta(x) + ': ' + v + ' g');
-      var barra = document.createElement('i');
-      barra.style.height = (v / max * 100) + '%';
-      if (v >= d.meta) barra.className = 'cumple';
-      b.appendChild(barra);
-      b.onclick = function () { salud.dia = x; pintarProteina(); };
-      barras.appendChild(b);
-      var et = document.createElement('span');
-      et.className = x === dia ? 'sel' : '';
-      et.textContent = x === hoy() ? 'hoy' : fechaDe(x).toLocaleDateString('es-CL', { weekday: 'short' }).replace('.', '');
-      eje.appendChild(et);
-    });
-    $('prot-linea').style.bottom = (d.meta / max * 180) + 'px';
-    var semana = dias.reduce(function (a, x) { return a + (porDia[x] || 0); }, 0);
-    $('prot-semana').textContent = 'Meta cumplida ' + cumplidos + ' de 7 días · promedio ' + Math.round(semana / 7) + ' g/día';
+  function montarProteina(cont, persona) {
+    if (!cont) return;
+    var p = cont._proteina;
+    if (!p || p.persona !== persona) p = cont._proteina = crearProteina(cont, persona);
+    p.cargar();
   }
 
-  $('prot-gramos').addEventListener('input', function () {
-    var n = soloNumero(this);
-    this.value = n ? String(n) : '';
-  });
+  function crearProteina(cont, persona) {
+    var st = { persona: persona, datos: null, dia: hoy(), editado: false };
+    cont.innerHTML =
+      '<section class="card">' +
+        '<div class="fila"><h2 style="margin:0">Proteína</h2><button class="link" data-p="meta" type="button"></button></div>' +
+        '<div class="total" data-p="dia"></div>' +
+        '<div class="grande" data-p="total">—</div>' +
+        '<div class="progreso" data-p="barra"><i></i></div>' +
+        '<div class="total" data-p="falta"></div>' +
+        '<form novalidate>' +
+          '<label>Proteína total del día</label>' +
+          '<input data-p="gramos" type="text" inputmode="numeric" placeholder="0 g" autocomplete="off">' +
+          '<label>Nota del día <span style="font-weight:400">(opcional)</span></label>' +
+          '<textarea data-p="nota" maxlength="500" placeholder="¿Cómo fue? Ej: base de huevos, comí azúcar, me sentí feliz con lo que comí…"></textarea>' +
+          '<div class="chips" data-p="chips"></div>' +
+          '<button class="btn" data-p="guardar" type="submit" style="margin-top:14px">Guardar</button>' +
+        '</form>' +
+        '<div class="acciones"><button class="link" data-p="borrar" type="button" hidden>Borrar este día</button></div>' +
+        '<div class="msg" data-p="msg" hidden></div>' +
+      '</section>' +
+      '<section class="card">' +
+        '<h2>Últimos 7 días</h2>' +
+        '<div class="total" data-p="semana"></div>' +
+        '<div class="barras-cont"><div class="barras" data-p="barras"></div><div class="linea-meta" data-p="linea"></div></div>' +
+        '<div class="barras-eje" data-p="eje"></div>' +
+      '</section>' +
+      '<section class="card">' +
+        '<h2>Días anteriores</h2>' +
+        '<ul class="lista" data-p="lista"></ul>' +
+      '</section>';
+    var el = function (n) { return cont.querySelector('[data-p="' + n + '"]'); };
 
-  $('form-prot').addEventListener('submit', function (e) {
-    e.preventDefault();
-    var gramos = soloNumero($('prot-gramos'));
-    var alimento = $('prot-alimento').value.trim();
-    if (!alimento) return mensaje($('prot-msg'), 'Escribe qué comiste', 'err');
-    if (!gramos) return mensaje($('prot-msg'), 'Ingresa los gramos de proteína', 'err');
-    accionSalud('proteinaAdd', { alimento: alimento, gramos: gramos, fecha: salud.dia }, $('prot-guardar')).then(function () {
-      $('prot-alimento').value = '';
-      $('prot-gramos').value = '';
-    }).catch(function () {});
-  });
+    function regDe(fecha) {
+      var r = st.datos ? st.datos.registros : [];
+      for (var i = 0; i < r.length; i++) if (r[i].fecha === fecha) return r[i];
+      return null;
+    }
+    function nombreDe(fecha) {
+      return fecha === hoy() ? 'Hoy' : fecha === haceDias(1) ? 'Ayer'
+        : fechaDe(fecha).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
+    }
 
-  $('prot-meta').addEventListener('click', function () {
-    var actual = salud.datos ? salud.datos.proteina.meta : 100;
-    var nueva = Number((prompt('Meta diaria de proteína (gramos):', actual) || '').replace(/\D/g, ''));
-    if (nueva) accionSalud('proteinaMeta', { meta: nueva }, this).catch(function () {});
-  });
+    function cargar() {
+      if (st.datos) pintar(); else mensajeLista(el('lista'), 'Cargando…');
+      api('proteina', { persona: st.persona }).then(function (res) { st.datos = res; pintar(); }).catch(function (err) {
+        mensaje(el('msg'), 'No se pudo cargar: ' + scriptViejo(err), 'err');
+      });
+    }
+
+    function accion(nombre, datos, boton) {
+      if (boton) boton.disabled = true;
+      return api(nombre, Object.assign({ persona: st.persona }, datos)).then(function (res) {
+        if (boton) boton.disabled = false;
+        st.datos = res;
+        st.editado = false;
+        pintar();
+      }, function (err) {
+        if (boton) boton.disabled = false;
+        mensaje(el('msg'), scriptViejo(err), 'err');
+        throw err;
+      });
+    }
+
+    function elegirDia(fecha) {
+      st.dia = fecha;
+      st.editado = false;
+      pintar();
+    }
+
+    function pintar() {
+      var d = st.datos;
+      var reg = regDe(st.dia);
+      var total = reg ? reg.gramos : 0;
+      var nombre = nombreDe(st.dia);
+      el('msg').hidden = true;
+      el('meta').textContent = 'Meta: ' + d.meta + ' g · cambiar';
+      el('dia').textContent = nombre;
+      el('total').textContent = total + ' g';
+      el('barra').querySelector('i').style.width = Math.min(100, total / d.meta * 100) + '%';
+      el('barra').classList.toggle('lista-meta', total >= d.meta);
+      el('falta').textContent = !reg ? 'Sin registro todavía' : total >= d.meta ? '✓ Meta cumplida 💪' : 'Faltaron ' + (d.meta - total) + ' g para la meta';
+      if (st.dia === hoy() && reg && total < d.meta) el('falta').textContent = 'Faltan ' + (d.meta - total) + ' g para la meta';
+
+      // El formulario muestra lo guardado del día elegido (si no se está escribiendo).
+      if (!st.editado) {
+        el('gramos').value = reg ? String(reg.gramos) : '';
+        el('nota').value = reg ? reg.nota : '';
+      }
+      el('guardar').textContent = (reg ? 'Actualizar ' : 'Guardar ') + (st.dia === hoy() ? 'hoy' : nombre.toLowerCase());
+      el('borrar').hidden = !reg;
+      pintarChips();
+
+      // Últimos 7 días (tocar una barra elige ese día)
+      var porDia = {};
+      d.registros.forEach(function (x) { porDia[x.fecha] = x.gramos; });
+      var dias = [];
+      for (var i = 6; i >= 0; i--) dias.push(haceDias(i));
+      var max = Math.max.apply(null, dias.map(function (x) { return porDia[x] || 0; }).concat([d.meta * 1.15]));
+      var barras = el('barras'), eje = el('eje');
+      barras.innerHTML = ''; eje.innerHTML = '';
+      var cumplidos = 0, anotados = 0, suma = 0;
+      dias.forEach(function (x) {
+        var v = porDia[x] || 0;
+        if (v >= d.meta) cumplidos++;
+        if (x in porDia) { anotados++; suma += v; }
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = x === st.dia ? 'sel' : '';
+        b.setAttribute('aria-label', fechaCorta(x) + ': ' + v + ' g');
+        var barra = document.createElement('i');
+        barra.style.height = (v / max * 100) + '%';
+        if (v >= d.meta) barra.className = 'cumple';
+        b.appendChild(barra);
+        b.onclick = function () { elegirDia(x); };
+        barras.appendChild(b);
+        var et = document.createElement('span');
+        et.className = x === st.dia ? 'sel' : '';
+        et.textContent = x === hoy() ? 'hoy' : fechaDe(x).toLocaleDateString('es-CL', { weekday: 'short' }).replace('.', '');
+        eje.appendChild(et);
+      });
+      el('linea').style.bottom = (d.meta / max * 180) + 'px';
+      el('semana').textContent = 'Meta cumplida ' + cumplidos + ' de 7 días' +
+        (anotados ? ' · promedio ' + Math.round(suma / anotados) + ' g en los días anotados' : '');
+
+      // Días anteriores con su nota (tocar uno lo abre para editar)
+      var ul = el('lista');
+      ul.innerHTML = '';
+      if (!d.registros.length) mensajeLista(ul, 'Todavía no hay días anotados.');
+      d.registros.forEach(function (x) {
+        var li = document.createElement('li');
+        if (x.fecha === st.dia) li.className = 'sel';
+        var info = document.createElement('div'); info.className = 'info';
+        var l1 = document.createElement('div'); l1.className = 'linea1';
+        var f = document.createElement('span'); f.textContent = nombreDe(x.fecha).replace(/^\w/, function (c) { return c.toUpperCase(); });
+        var g = document.createElement('span'); g.textContent = x.gramos + ' g' + (x.gramos >= d.meta ? ' ✓' : '');
+        if (x.gramos >= d.meta) g.className = 'cumple';
+        l1.append(f, g);
+        info.appendChild(l1);
+        if (x.nota) {
+          var n = document.createElement('div'); n.className = 'nota'; n.textContent = x.nota;
+          info.appendChild(n);
+        }
+        li.appendChild(info);
+        li.onclick = function () { elegirDia(x.fecha); cont.querySelector('section').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+        ul.appendChild(li);
+      });
+    }
+
+    // Notas rápidas: un toque las agrega o las saca de la nota.
+    function pintarChips() {
+      var chips = el('chips');
+      chips.innerHTML = '';
+      var nota = el('nota').value;
+      NOTAS_RAPIDAS.forEach(function (t) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = t;
+        if (nota.indexOf(t) !== -1) b.className = 'on';
+        b.onclick = function () {
+          var v = el('nota').value;
+          if (v.indexOf(t) !== -1) v = v.replace(t, '').replace(/^[\s·,]+|[\s·,]+$/g, '').replace(/(\s*·\s*){2,}/g, ' · ');
+          else v = v.trim() ? v.trim() + ' · ' + t : t;
+          el('nota').value = v;
+          st.editado = true;
+          pintarChips();
+        };
+        chips.appendChild(b);
+      });
+    }
+
+    el('gramos').addEventListener('input', function () {
+      var n = soloNumero(this);
+      this.value = n ? String(n) : '';
+      st.editado = true;
+    });
+    el('nota').addEventListener('input', function () { st.editado = true; pintarChips(); });
+
+    cont.querySelector('form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      if (!el('gramos').value) return mensaje(el('msg'), 'Ingresa los gramos de proteína del día', 'err');
+      accion('proteinaGuardar', { fecha: st.dia, gramos: soloNumero(el('gramos')), nota: el('nota').value.trim() }, el('guardar'))
+        .then(function () { mensaje(el('msg'), '✓ Guardado', 'ok'); }).catch(function () {});
+    });
+
+    el('borrar').addEventListener('click', function () {
+      if (confirm('¿Borrar el registro de ' + nombreDe(st.dia).toLowerCase() + '?')) {
+        accion('proteinaBorrar', { fecha: st.dia }, this).catch(function () {});
+      }
+    });
+
+    el('meta').addEventListener('click', function () {
+      var actual = st.datos ? st.datos.meta : 100;
+      var nueva = Number((prompt('Meta diaria de proteína (gramos):', actual) || '').replace(/\D/g, ''));
+      if (nueva) accion('proteinaMeta', { meta: nueva }, this).catch(function () {});
+    });
+
+    return { persona: persona, cargar: cargar };
+  }
 
   // ---------- Datos para los gráficos ----------
   // filas: [{ mes: 'yyyy-MM', centro, persona, total }] agrupadas por el script.

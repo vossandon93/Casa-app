@@ -121,7 +121,7 @@ Sin esto la app se protege solo con el PIN (con límite: 5 intentos fallidos blo
 Además de las pestañas comunes, cada persona ve las suyas según quién eligió al entrar:
 
 - **Vicente → Rendición:** sube la foto del comprobante (o un PDF), el monto y la descripción. La foto queda en la carpeta **Rendiciones - comprobantes** de tu Google Drive, la fila en la hoja **Rendiciones** y se envía un correo automático con la foto adjunta. Cada rendición se puede marcar como *Pagada* cuando te la reembolsen.
-- **Fran → Salud:** contador de días sin azúcar (con récord y calendario de las últimas 5 semanas) y contador de proteína diaria con meta, botones de un toque y gráfico de los últimos 7 días. Los datos quedan en las hojas **Azúcar** y **Proteína**.
+- **Fran → Salud:** contador de días sin azúcar (con récord y calendario de las últimas 5 semanas) y proteína diaria: un registro por día con el total de gramos y una nota opcional (base de huevos, comí azúcar, cómo se sintió…), meta, gráfico de los últimos 7 días y días anteriores con su nota. El mismo bloque de proteína se usa en Deporte de Vicente; cada persona tiene sus datos y su meta. Los datos quedan en las hojas **Azúcar** y **Proteína**.
 
 Para activarlas (una sola vez):
 
