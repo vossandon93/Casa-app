@@ -116,11 +116,17 @@ Sin esto la app se protege solo con el PIN (con límite: 5 intentos fallidos blo
 - **verSesiones**: muestra qué cuentas tienen sesión abierta. **cerrarTodasLasSesiones**: obliga a todos a entrar de nuevo con Google (úsalo si pierdes un equipo).
 - Para volver al PIN, borra `CORREOS_PERMITIDOS`.
 
-## Pestañas personales (Rendición y Salud)
+## Pestañas personales (Rendición, Deporte y Salud)
 
 Además de las pestañas comunes, cada persona ve las suyas según quién eligió al entrar:
 
 - **Vicente → Rendición:** sube la foto del comprobante (o un PDF), el monto y la descripción. La foto queda en la carpeta **Rendiciones - comprobantes** de tu Google Drive, la fila en la hoja **Rendiciones** y se envía un correo automático con la foto adjunta. Cada rendición se puede marcar como *Pagada* cuando te la reembolsen.
+- **Vicente → Deporte:** cuatro pestañas.
+  - **Hoy:** sugiere qué zona toca según lo que llevas más días sin trabajar y arma una rutina de ~60 min (calentamiento, rodilla, fuerza, core, cardio, calma). Cada ejercicio se puede cambiar (↻) o dejar de proponer (✕). Los saltos e impacto están apagados por la rodilla.
+  - **Registro:** qué hiciste cada día (Upper, Lower, Core, Cardio, Full body, Movilidad), minutos y ejercicios con series/peso. Queda en la hoja **Entrenamientos**.
+  - **Progreso:** entrenamientos de la semana vs. la meta, calendario de 5 semanas, cada zona hace cuánto, último registro de cada ejercicio y peso vs. la meta.
+  - **Diario:** la misma tarjeta de proteína diaria de Salud (hoja **Proteína**, con la persona), contador de cigarros, etiquetas y nota de la comida, y peso. Cigarros, comida y peso quedan en la hoja **Diario Vicente**.
+  - Metas (se cambian desde la app): `DEPORTE_META_SEMANA` (4) y `DEPORTE_META_PESO` (76 kg) en Propiedades del script.
 - **Fran → Salud:** contador de días sin azúcar (con récord y calendario de las últimas 5 semanas) y proteína diaria: un registro por día con el total de gramos y una nota opcional (base de huevos, comí azúcar, cómo se sintió…), meta, gráfico de los últimos 7 días y días anteriores con su nota. El mismo bloque de proteína se usa en Deporte de Vicente; cada persona tiene sus datos y su meta. Los datos quedan en las hojas **Azúcar** y **Proteína**.
 
 Para activarlas (una sola vez):
