@@ -1,5 +1,5 @@
 /**
- * Backend de Gastos Familia (Google Apps Script).
+ * Backend de Casa App (Google Apps Script).
  *
  * Se pega en Extensiones > Apps Script de la planilla de Google.
  * Ver SETUP.md para las instrucciones completas.
@@ -57,7 +57,7 @@ var METAS_DEPORTE = {
 };
 var ULTIMAS_RENDICIONES = 50;
 // Se muestra al abrir la URL /exec: sirve para comprobar que Google tiene el código nuevo.
-var VERSION = '2026-11-04 · formato visual de la planilla';
+var VERSION = '2026-11-05 · nombre Casa App';
 
 // ---------------------------------------------------------------------------
 // Instalación: ejecutar una vez desde el editor (botón "Ejecutar" con setup).
@@ -70,7 +70,7 @@ function setup() {
     // se usa la planilla creada antes o se crea una nueva en tu Drive.
     var props = PropertiesService.getScriptProperties();
     var id = props.getProperty('SHEET_ID');
-    ss = id ? SpreadsheetApp.openById(id) : SpreadsheetApp.create('Gastos Familia');
+    ss = id ? SpreadsheetApp.openById(id) : SpreadsheetApp.create('Casa App');
     props.setProperty('SHEET_ID', ss.getId());
     Logger.log('Planilla: ' + ss.getUrl());
   }
@@ -602,7 +602,7 @@ function problemasGastos_() {
 // ---------------------------------------------------------------------------
 
 function doGet() {
-  return json_({ ok: true, mensaje: 'Gastos Familia: backend funcionando.', version: VERSION });
+  return json_({ ok: true, mensaje: 'Casa App: backend funcionando.', version: VERSION });
 }
 
 function doPost(e) {

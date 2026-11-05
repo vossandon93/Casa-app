@@ -1,6 +1,6 @@
 {
-  "name": "Gastos Familia",
-  "short_name": "Gastos",
+  "name": "Casa App",
+  "short_name": "Casa App",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

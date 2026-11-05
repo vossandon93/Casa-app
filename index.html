@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Gastos Familia</title>
+  <title>Casa App</title>
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" id="theme-color" content="#f4f6f5">
   <script>
@@ -395,7 +395,7 @@
 <main>
   <!-- Pantalla de ingreso: PIN + quién soy -->
   <section id="login" hidden>
-    <header><h1>Gastos Familia</h1></header>
+    <header><h1>Casa App</h1></header>
     <div class="card">
       <form id="form-pin">
         <div id="pin-campos">
@@ -419,7 +419,7 @@
 
   <!-- Pantalla de bloqueo con Face ID / Touch ID -->
   <section id="bloqueo" hidden>
-    <header><h1>Gastos Familia</h1></header>
+    <header><h1>Casa App</h1></header>
     <div class="card centrado">
       <div class="bio-ico" id="bloqueo-ico" style="font-size:48px;margin:8px 0">🔒</div>
       <button class="btn" id="desbloquear" type="button">Abrir con <span class="bio-nombre">Face ID</span></button>
@@ -431,7 +431,7 @@
   <!-- Pantalla principal -->
   <section id="app" hidden>
     <header>
-      <h1>Gastos Familia</h1>
+      <h1>Casa App</h1>
       <button class="link" id="cambiar" type="button"></button>
     </header>
 
@@ -3136,8 +3136,8 @@
   function activarFaceId() {
     return navigator.credentials.create({ publicKey: {
       challenge: azar(32),
-      rp: { name: 'Gastos Familia', id: location.hostname || undefined },
-      user: { id: datosLlave(), name: 'Gastos Familia · ' + (estado.persona || ''), displayName: 'Gastos Familia · ' + (estado.persona || '') },
+      rp: { name: 'Casa App', id: location.hostname || undefined },
+      user: { id: datosLlave(), name: 'Casa App · ' + (estado.persona || ''), displayName: 'Casa App · ' + (estado.persona || '') },
       pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
       authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'required', requireResidentKey: true },
       timeout: 60000

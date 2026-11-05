@@ -10,7 +10,7 @@ GitHub Pages            (intermediario)          (Gastos + Resúmenes)
 ## 1. Crear la planilla
 
 1. Entra a [sheets.new](https://sheets.new) con tu cuenta de Google.
-2. Ponle de nombre **Gastos Familia**.
+2. Ponle de nombre **Casa App**.
 
 ## 2. Pegar el script
 
@@ -56,7 +56,7 @@ El PIN vive solo ahí, nunca en GitHub.
 1. Asegúrate de que estos archivos estén en la rama `main` (mergeando el pull request de esta rama).
 2. En el repo: **Settings → General → Danger Zone → Change visibility → Public**. (Solo el código queda público; los gastos están en tu Google Drive.)
 3. **Settings → Pages → Build and deployment**: Source **Deploy from a branch**, Branch **main** y carpeta **/ (root)** → **Save**.
-4. En 1–2 minutos la app queda en: **https://vossandon93.github.io/Finanzas/**
+4. En 1–2 minutos la app queda en: **https://vossandon93.github.io/Casa-app/**
 
 ## 8. Instalar en los celulares
 
@@ -95,12 +95,12 @@ Columnas: ID · Fecha · **Centro de costo · Cuenta** · Monto · Descripción 
 Sin esto la app se protege solo con el PIN (con límite: 5 intentos fallidos bloquean el ingreso 15 minutos). Con esto, **solo entran los correos que tú elijas**, con su cuenta de Google, y el PIN deja de servir. Los correos quedan en las propiedades del script, no en GitHub.
 
 **A. Crear el ID de cliente de Google (una vez, ~5 min)**
-1. Entra a https://console.cloud.google.com/ con tu cuenta y crea un proyecto (ej. "Gastos Familia").
-2. Menú → **APIs y servicios → Pantalla de consentimiento de OAuth** (o **Google Auth Platform**) → **Comenzar**: nombre "Gastos Familia", tu correo de soporte, público **Externo**, acepta y crea.
+1. Entra a https://console.cloud.google.com/ con tu cuenta y crea un proyecto (ej. "Casa App").
+2. Menú → **APIs y servicios → Pantalla de consentimiento de OAuth** (o **Google Auth Platform**) → **Comenzar**: nombre "Casa App", tu correo de soporte, público **Externo**, acepta y crea.
 3. En **Público / Audiencia → Usuarios de prueba** agrega los 2 correos que tendrán acceso (deja la app en modo *Prueba*: es otra capa de protección).
 4. **Clientes → Crear cliente** → tipo **Aplicación web**:
    - Orígenes autorizados de JavaScript: `https://vossandon93.github.io`
-   - URI de redireccionamiento autorizados: `https://vossandon93.github.io/Finanzas/` (con la barra final)
+   - URI de redireccionamiento autorizados: `https://vossandon93.github.io/Casa-app/` (con la barra final)
 5. Copia el **ID de cliente** (termina en `.apps.googleusercontent.com`). No es secreto.
 
 **B. Activarlo en Apps Script**
