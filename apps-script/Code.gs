@@ -20,6 +20,7 @@ var HOJA_AZUCAR = 'Azúcar';
 var HOJA_PROTEINA = 'Proteína';
 var HOJA_ENTRENOS = 'Entrenamientos';
 var HOJA_DIARIO = 'Diario Vicente';
+var HOJA_TABACOS = 'Tabacos Vicente';
 
 // Orden lógico que usa el código (f[0]..f[7]). En la hoja las columnas se buscan por
 // su encabezado, así que pueden estar en otro orden (ORDEN_HOJA_GASTOS).
@@ -50,6 +51,8 @@ var META_PROTEINA_INICIAL = 100;
 // La proteína de Vicente va en la hoja Proteína (mismo componente que Salud).
 var COLUMNAS_ENTRENOS = ['ID', 'Fecha', 'Categorías', 'Minutos', 'Ejercicios', 'Nota', 'Creado'];
 var COLUMNAS_DIARIO = ['Fecha', 'Cigarros', 'Comida', 'Etiquetas', 'Peso (kg)', 'Actualizado'];
+// Un tabaco por fila, con la hora (HH:mm). La columna Cigarros del Diario lleva el total del día.
+var COLUMNAS_TABACOS = ['ID', 'Fecha', 'Hora', 'Creado'];
 var CATEGORIAS_DEPORTE = ['Upper', 'Lower', 'Core', 'Cardio', 'Full body', 'Movilidad'];
 var METAS_DEPORTE = {
   semana: { prop: 'DEPORTE_META_SEMANA', inicial: 4, min: 1, max: 7 },
@@ -122,6 +125,7 @@ function setup() {
   prepararHoja_(ss, HOJA_PROTEINA, COLUMNAS_PROTEINA);
   prepararHoja_(ss, HOJA_ENTRENOS, COLUMNAS_ENTRENOS);
   prepararHoja_(ss, HOJA_DIARIO, COLUMNAS_DIARIO);
+  prepararHoja_(ss, HOJA_TABACOS, COLUMNAS_TABACOS);
 
   // Pide (una vez) los permisos de Drive y Gmail que usan las rendiciones.
   carpetaRendiciones_();
@@ -688,6 +692,12 @@ function doPost(e) {
         return json_(Object.assign({ ok: true }, datosDeporte_()));
       case 'diarioGuardar':
         guardarDiario_(body);
+        return json_(Object.assign({ ok: true }, datosDeporte_()));
+      case 'tabacoAgregar':
+        agregarTabaco_(body);
+        return json_(Object.assign({ ok: true }, datosDeporte_()));
+      case 'tabacoBorrar':
+        borrarTabaco_(body.id);
         return json_(Object.assign({ ok: true }, datosDeporte_()));
       case 'deporteMeta':
         cambiarMetaDeporte_(body.clave, body.valor);
@@ -1487,9 +1497,22 @@ function datosDeporte_() {
   var ocultos = [];
   try { ocultos = JSON.parse(props.getProperty('DEPORTE_OCULTOS') || '[]'); } catch (e) {}
 
+  var hojaT = hoja_(HOJA_TABACOS, COLUMNAS_TABACOS);
+  var tabacos = hojaT.getLastRow() < 2 ? [] : hojaT.getRange(2, 1, hojaT.getLastRow() - 1, 3).getValues()
+    .filter(function (f) { return f[0] && f[1] instanceof Date; })
+    .map(function (f) {
+      return {
+        id: f[0],
+        fecha: Utilities.formatDate(f[1], tz, 'yyyy-MM-dd'),
+        hora: f[2] instanceof Date ? Utilities.formatDate(f[2], tz, 'HH:mm') : String(f[2] || '')
+      };
+    })
+    .filter(function (t) { return t.fecha >= desdeD; });
+
   return {
     sesiones: sesiones,
     diario: filas.filter(function (f) { return f.fecha >= desdeD; }),
+    tabacos: tabacos,
     pesos: pesos.slice(-30),
     metas: metas,
     ocultos: ocultos
@@ -1581,6 +1604,33 @@ function guardarDiario_(body) {
   }
   if (!Object.keys(cambios).length) throw new Error('No hay nada que guardar');
   editarDiario_(body.fecha, cambios);
+}
+
+// Tabacos: una fila con la hora y +1 en la columna Cigarros del Diario de ese día.
+function agregarTabaco_(body) {
+  var m = /^(\d{1,2}):(\d{2})$/.exec(String(body.hora || ''));
+  if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) throw new Error('Hora inválida');
+  var hora = (m[1].length < 2 ? '0' : '') + m[1] + ':' + m[2];
+  var hoja = hoja_(HOJA_TABACOS, COLUMNAS_TABACOS);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var fila = hoja.getLastRow() + 1;
+    hoja.getRange(fila, 1, 1, 4)
+      .setNumberFormats([['@', 'dd/mm/yyyy', '@', 'dd/mm/yyyy hh:mm']])
+      .setValues([[Utilities.getUuid(), parsearFecha_(body.fecha), hora, new Date()]]);
+  } finally {
+    lock.releaseLock();
+  }
+  sumarDiario_({ fecha: body.fecha, campo: 'cigarros', n: 1 });
+}
+
+function borrarTabaco_(id) {
+  var tz = libro_().getSpreadsheetTimeZone();
+  var hoja = hoja_(HOJA_TABACOS, COLUMNAS_TABACOS);
+  var fecha = hoja.getRange(filaDeId_(hoja, id), 2).getValue();
+  borrarFilaPorId_(hoja, id);
+  if (fecha instanceof Date) sumarDiario_({ fecha: Utilities.formatDate(fecha, tz, 'yyyy-MM-dd'), campo: 'cigarros', n: -1 });
 }
 
 function cambiarMetaDeporte_(clave, valor) {
@@ -1678,13 +1728,13 @@ var COLOR_PESTANA = {
   'Centros': '#9AA5B1', 'Cuentas': '#9AA5B1', 'Personas': '#9AA5B1',
   'Rendiciones': '#B7791F',
   'Azúcar': '#8E5AA8', 'Proteína': '#8E5AA8',
-  'Entrenamientos': '#C0504D', 'Diario Vicente': '#C0504D'
+  'Entrenamientos': '#C0504D', 'Diario Vicente': '#C0504D', 'Tabacos Vicente': '#C0504D'
 };
 
 // Orden de las pestañas (las que no están aquí quedan al final, como estén).
 var ORDEN_PESTANAS = ['Gastos', 'Resumen mensual', 'Resumen anual', 'Resumen por cuenta',
   'Centros', 'Cuentas', 'Personas', 'Rendiciones', 'Azúcar', 'Proteína',
-  'Entrenamientos', 'Diario Vicente'];
+  'Entrenamientos', 'Diario Vicente', 'Tabacos Vicente'];
 
 // El espacio al final separa el monto de la columna siguiente.
 var FMT_PESOS = '$#,##0" ";-$#,##0" "';
@@ -1713,6 +1763,7 @@ var COLUMNAS_ESTILO = {
   'Minutos': { ancho: 80, formato: '0', alinear: 'right' },
   'Ejercicios': { ancho: 280, ajustar: true },
   'Cigarros': { ancho: 85, formato: '0', alinear: 'right' },
+  'Hora': { ancho: 70, formato: '@', alinear: 'center' },
   'Comida': { ancho: 240, ajustar: true },
   'Etiquetas': { ancho: 160 },
   'Peso (kg)': { ancho: 85, formato: '0.0', alinear: 'right' },

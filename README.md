@@ -7,6 +7,6 @@ App web simple para que dos personas anoten gastos desde el celular: se elige el
 - **Datos:** Google Sheets (hojas Gastos, Centros, Personas, Resumen mensual, Resumen anual). Se descarga como Excel cuando quieras.
 - **Pestañas personales:** Rendición y Deporte (Vicente) y Salud (Fran: días sin azúcar y proteína diaria con nota del día).
   - Rendición: gasto + foto con correo automático.
-  - Deporte: rutina propuesta del día, registro de entrenamientos, progreso y diario (proteína compartida con Salud, comida, cigarros y peso).
+  - Deporte: rutina propuesta del día, registro de entrenamientos, progreso y diario simple (proteína del día con nota y tabacos con hora).
 
 Instalación: ver [SETUP.md](SETUP.md).
