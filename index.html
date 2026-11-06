@@ -326,17 +326,13 @@
     .semanas i.entreno { background: var(--accent-fill); }
     #dep-zonas li, #dep-zonas .l1 { cursor: default; }
     #dep-zonas .l1::after { content: none; }
-    .contador { display: flex; align-items: center; justify-content: center; gap: 22px; margin: 6px 0; }
-    .contador .num { font-size: 56px; font-weight: 800; min-width: 80px; text-align: center; font-variant-numeric: tabular-nums; }
-    .contador button {
-      width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--border); background: var(--bg);
-      color: var(--text); font: inherit; font-size: 30px; font-weight: 700; cursor: pointer;
-    }
-    .contador button.mas { border-color: var(--accent); color: var(--accent); }
-    .cuentas button.malo[aria-pressed="true"] { border-color: var(--danger); color: var(--danger); background: var(--err-soft); }
-    .cuentas button.bueno[aria-pressed="true"] { border-color: var(--ok); color: var(--ok); background: var(--ok-soft); }
-    .barras.bajas { height: 100px; }
-    .barras i.alto { background: var(--danger); }
+    /* Diario simple: Proteína → Tabacos → días anteriores de proteína (sin el gráfico de 7 días). */
+    #pag-dep-diario:not([hidden]) { display: flex; flex-direction: column; }
+    #dep-proteina > :nth-child(2) { display: none; }
+    #dep-proteina > :nth-child(3) { order: 2; }
+    .tab-agregar { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 8px; margin: 12px 0 4px; }
+    .tab-agregar .btn { margin: 0; }
+    #tab-num { font-size: 56px; line-height: 1.1; }
     [data-tema="oscuro"] .card { border-color: transparent; }
     [data-tema="oscuro"] input, [data-tema="oscuro"] select,
     [data-tema="oscuro"] .campo-fecha, [data-tema="oscuro"] .foto-btn { background-color: var(--campo); border-color: transparent; }
@@ -348,7 +344,6 @@
     [data-tema="oscuro"] .dato, [data-tema="oscuro"] .leyenda .barra, [data-tema="oscuro"] .progreso { background: var(--campo); }
     [data-tema="oscuro"] .dona circle[stroke="var(--border)"] { stroke: var(--campo); }
     [data-tema="oscuro"] .lista li, [data-tema="oscuro"] .ej { border-top-color: #2c2c2e; }
-    [data-tema="oscuro"] .contador button { background: var(--campo); }
     [data-tema="oscuro"] .borrar { border-color: #3a3a3c; }
 
     /* Selector de apariencia */
@@ -372,11 +367,11 @@
       #pag-salud > :first-child { grid-row: auto; }
       #pag-salud .prot-cont > * { margin: 0; grid-column: 2; }
       #pag-salud .prot-cont > :first-child { grid-column: 1; }
-      #pag-dep-diario .prot-cont > * { margin: 0; }
-      #pag-dep-hoy, #pag-dep-registro, #pag-dep-progreso, #pag-dep-diario {
+      #pag-dep-diario { max-width: 560px; margin: 0 auto; }
+      #pag-dep-hoy, #pag-dep-registro, #pag-dep-progreso {
         display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start;
       }
-      #pag-dep-hoy > *, #pag-dep-registro > *, #pag-dep-progreso > *, #pag-dep-diario > * { margin: 0; }
+      #pag-dep-hoy > *, #pag-dep-registro > *, #pag-dep-progreso > * { margin: 0; }
       #dep-rutina { display: grid; gap: 16px; }
       #dep-rutina > * { margin: 0; }
       .tabs, .subtabs, .bio-invita { max-width: 560px; margin-left: auto; margin-right: auto; }
@@ -677,7 +672,7 @@
         <div class="total">Lo último que anotaste de cada uno.</div>
         <ul class="lista" id="dep-ejs"></ul>
       </section>
-      <section class="card">
+      <section class="card" id="dep-peso-card">
         <div class="fila">
           <h2 style="margin:0">Peso</h2>
           <button class="link" id="dep-meta-peso" type="button"></button>
@@ -688,42 +683,24 @@
     </div>
 
     <div id="pag-dep-diario" hidden>
-      <!-- Proteína diaria: el mismo componente de Salud (montarProteina), con los datos de Vicente.
-           Tiene su propio día; las flechas de abajo son para cigarros, comida y peso -->
+      <!-- Diario simple: proteína del día con nota (componente montarProteina, el mismo de Salud)
+           y tabacos con la hora de cada uno. -->
       <div class="prot-cont" id="dep-proteina"></div>
       <section class="card">
-        <h2>Cigarros, comida y peso</h2>
+        <h2>Tabacos</h2>
         <div class="periodo">
           <button class="flecha" type="button" id="dia-ant" aria-label="Día anterior">‹</button>
           <div class="nombre" id="dia-nombre"></div>
           <button class="flecha" type="button" id="dia-sig" aria-label="Día siguiente">›</button>
         </div>
-      </section>
-      <section class="card">
-        <h2>Cigarros</h2>
-        <div class="contador">
-          <button type="button" id="cig-menos" aria-label="Uno menos">−</button>
-          <div class="num" id="cig-num">0</div>
-          <button type="button" class="mas" id="cig-mas" aria-label="Uno más">+</button>
+        <div class="grande centrado" id="tab-num">0</div>
+        <div class="total centrado" id="tab-txt"></div>
+        <div class="tab-agregar">
+          <input id="tab-hora" type="time" aria-label="Hora">
+          <button class="btn" id="tab-mas" type="button">+ Tabaco</button>
         </div>
-        <div class="total centrado" id="cig-txt"></div>
-        <div class="barras bajas" id="cig-barras"></div>
-        <div class="barras-eje" id="cig-eje"></div>
-        <div id="cig-msg" class="msg" hidden></div>
-      </section>
-      <section class="card">
-        <h2>Comida</h2>
-        <div class="cuentas" id="com-tags"></div>
-        <label for="com-nota">Nota</label>
-        <input id="com-nota" type="text" maxlength="300" placeholder="Ej: sin bebida, pero me pasé con la mayo y el ketchup" autocomplete="off">
-        <label for="com-peso">Peso (kg, opcional)</label>
-        <input id="com-peso" type="text" inputmode="decimal" placeholder="Ej: 72,5" autocomplete="off">
-        <button class="btn" id="com-guardar" type="button">Guardar</button>
-        <div id="com-msg" class="msg" hidden></div>
-      </section>
-      <section class="card">
-        <h2>Últimos 7 días</h2>
-        <ul class="lista" id="dia-semana"></ul>
+        <ul class="lista" id="tab-lista"></ul>
+        <div id="tab-msg" class="msg" hidden></div>
       </section>
     </div>
   </section>
@@ -1979,7 +1956,7 @@
   var EJ_POR_ID = {};
   EJERCICIOS.forEach(function (e) { EJ_POR_ID[e.id] = e; });
 
-  var dep = { datos: null, dia: '', rutina: null, saltos: false, hoyCats: [], entCats: [], tags: [], comidaSucia: false, pend: {} };
+  var dep = { datos: null, dia: '', rutina: null, saltos: false, hoyCats: [], entCats: [], horaTocada: false, enviandoTabaco: false };
   try { dep.rutina = JSON.parse(leer('deporte.rutina') || 'null'); } catch (e) {}
   dep.saltos = leer('deporte.saltos') === '1';
 
@@ -2545,10 +2522,9 @@
     var pesos = d.pesos || [];
     var metaPeso = d.metas.peso;
     $('dep-meta-peso').textContent = 'Meta: ' + String(metaPeso).replace('.', ',') + ' kg · cambiar';
-    if (!pesos.length) {
-      $('dep-peso').textContent = '—';
-      $('dep-peso-txt').textContent = 'Anótalo en Diario cuando te peses.';
-    } else {
+    // El peso ya no se anota en Diario: la tarjeta solo aparece si hay pesos guardados.
+    $('dep-peso-card').hidden = !pesos.length;
+    if (pesos.length) {
       var ult = pesos[pesos.length - 1];
       $('dep-peso').textContent = String(ult.peso).replace('.', ',') + ' kg';
       var falta = Math.round((metaPeso - ult.peso) * 10) / 10;
@@ -2569,167 +2545,86 @@
     pedirMeta('peso', 'Peso meta (kg):', dep.datos ? dep.datos.metas.peso : 76);
   });
 
-  // ---------- Diario: cigarros, comida y peso (la proteína es montarProteina) ----------
-  // Pares que se excluyen entre sí (marcar uno desmarca el otro).
-  var ETIQUETAS = [
-    { t: 'Sin azúcar', c: 'bueno', par: 'Comí azúcar' }, { t: 'Comí azúcar', c: 'malo', par: 'Sin azúcar' },
-    { t: 'Sin bebida', c: 'bueno', par: 'Bebida' }, { t: 'Bebida', c: 'malo', par: 'Sin bebida' },
-    { t: 'Comí bien', c: 'bueno' }, { t: 'Carbohidratos', c: 'malo' }, { t: 'Salsas', c: 'malo' },
-    { t: 'Frituras', c: 'malo' }, { t: 'Comida rápida', c: 'malo' }, { t: 'Alcohol', c: 'malo' }
-  ];
+  // ---------- Diario: tabacos con hora (la proteína es montarProteina) ----------
+  function horaAhora() {
+    var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return p(d.getHours()) + ':' + p(d.getMinutes());
+  }
 
-  function filaDia(iso) {
+  function tabacosDe(iso) {
+    return (dep.datos && dep.datos.tabacos || []).filter(function (t) { return t.fecha === iso; })
+      .sort(function (a, b) { return a.hora < b.hora ? -1 : a.hora > b.hora ? 1 : 0; });
+  }
+
+  // Total del día: la columna Cigarros del Diario (incluye los días antes de anotar la hora).
+  function totalTabacos(iso) {
     var f = dep.datos && dep.datos.diario.filter(function (x) { return x.fecha === iso; })[0];
-    return f || { fecha: iso, cigarros: 0, comida: '', etiquetas: [], peso: null };
-  }
-
-  // Valor que se muestra = lo del servidor + lo que todavía se está enviando.
-  function valorDia(iso, campo) {
-    var p = dep.pend[iso + '|' + campo];
-    return Math.max(0, filaDia(iso)[campo] + (p ? p.n + p.enviando : 0));
-  }
-
-  // Los toques rápidos (+1 cigarro, +25 g) se juntan y se mandan de una vez.
-  function sumarDia(campo, n, msg) {
-    var k = dep.dia + '|' + campo;
-    var p = dep.pend[k] || (dep.pend[k] = { fecha: dep.dia, campo: campo, n: 0, enviando: 0, t: 0, msg: msg });
-    if (valorDia(dep.dia, campo) + n < 0) return;
-    p.n += n;
-    msg.hidden = true;
-    pintarDiario();
-    clearTimeout(p.t);
-    p.t = setTimeout(function () { enviarPendiente(k); }, 600);
-  }
-
-  function enviarPendiente(k) {
-    var p = dep.pend[k];
-    if (!p || p.enviando || !p.n) return;
-    p.enviando = p.n;
-    p.n = 0;
-    api('diarioSumar', { fecha: p.fecha, campo: p.campo, n: p.enviando }).then(function (res) {
-      p.enviando = 0;
-      dep.datos = res;
-      if (p.n) enviarPendiente(k);
-      pintarDeporte();
-    }, function (err) {
-      p.enviando = 0;
-      mensaje(p.msg, 'No se guardó: ' + scriptViejo(err), 'err');
-      pintarDeporte();
-    });
+    return Math.max(f ? f.cigarros : 0, tabacosDe(iso).length);
   }
 
   function pintarDiario() {
     var dia = dep.dia;
     $('dia-nombre').textContent = nombreDia(dia);
     $('dia-sig').disabled = dia >= hoy();
-    var listo = !!dep.datos;
-    ['cig-menos', 'cig-mas', 'com-guardar'].forEach(function (id) { $(id).disabled = !listo; });
-    if (!listo) return;
-    var d = dep.datos, f = filaDia(dia);
-
-    // Cigarros
-    var cig = valorDia(dia, 'cigarros');
-    $('cig-num').textContent = cig;
-    $('cig-menos').disabled = cig <= 0;
-    var ayer = valorDia(sumarDias(dia, -1), 'cigarros');
-    var dias7 = [];
-    for (var i = 6; i >= 0; i--) dias7.push(sumarDias(dia, -i));
-    var suma7 = dias7.reduce(function (a, x) { return a + valorDia(x, 'cigarros'); }, 0);
-    $('cig-txt').textContent = 'Día anterior: ' + ayer + ' · promedio 7 días: ' + String(Math.round(suma7 / 7 * 10) / 10).replace('.', ',');
-    var barras = $('cig-barras'), eje = $('cig-eje');
-    barras.innerHTML = ''; eje.innerHTML = '';
-    var max = Math.max.apply(null, dias7.map(function (x) { return valorDia(x, 'cigarros'); }).concat([5]));
-    var prom = suma7 / 7;
-    dias7.forEach(function (x) {
-      var v = valorDia(x, 'cigarros');
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.className = x === dia ? 'sel' : '';
-      b.setAttribute('aria-label', fechaCorta(x) + ': ' + v + ' cigarros');
-      var barra = document.createElement('i');
-      barra.style.height = (v / max * 100) + '%';
-      if (v > prom && v > 0) barra.className = 'alto';
-      b.appendChild(barra);
-      b.onclick = function () { cambiarDia(x); };
-      barras.appendChild(b);
-      var et = document.createElement('span');
-      et.className = x === dia ? 'sel' : '';
-      et.textContent = fechaDe(x).toLocaleDateString('es-CL', { weekday: 'short' }).replace('.', '').slice(0, 2);
-      eje.appendChild(et);
-    });
-
-    // Comida y peso (no se pisa lo que se está escribiendo)
-    if (!dep.comidaSucia) {
-      dep.tags = f.etiquetas.slice();
-      $('com-nota').value = f.comida;
-      $('com-peso').value = f.peso ? String(f.peso).replace('.', ',') : '';
-    }
-    var tags = $('com-tags');
-    tags.innerHTML = '';
-    ETIQUETAS.forEach(function (e) {
-      var b = document.createElement('button');
-      b.type = 'button'; b.className = e.c; b.textContent = e.t;
-      b.setAttribute('aria-pressed', String(dep.tags.indexOf(e.t) !== -1));
-      b.onclick = function () {
-        var i = dep.tags.indexOf(e.t);
-        if (i === -1) {
-          dep.tags.push(e.t);
-          if (e.par && dep.tags.indexOf(e.par) !== -1) dep.tags.splice(dep.tags.indexOf(e.par), 1);
-        } else dep.tags.splice(i, 1);
-        dep.comidaSucia = true;
-        pintarDiario();
-      };
-      tags.appendChild(b);
-    });
-
-    // Últimos 7 días
-    var ul = $('dia-semana');
+    if (!dep.horaTocada) $('tab-hora').value = dia === hoy() ? horaAhora() : '';
+    $('tab-mas').disabled = !dep.datos || dep.enviandoTabaco;
+    var ul = $('tab-lista');
     ul.innerHTML = '';
-    for (var j = 0; j < 7; j++) (function (x) {
-      var fx = filaDia(x);
+    if (!dep.datos) { $('tab-num').textContent = '—'; $('tab-txt').textContent = 'Cargando…'; return; }
+
+    var lista = tabacosDe(dia), total = totalTabacos(dia);
+    $('tab-num').textContent = total;
+    var ayer = totalTabacos(sumarDias(dia, -1));
+    var txt = (total === 1 ? 'tabaco' : 'tabacos') + ' · día anterior: ' + ayer;
+    if (total > lista.length) txt += ' · ' + (total - lista.length) + ' sin hora';
+    $('tab-txt').textContent = txt;
+
+    lista.forEach(function (t, i) {
       var li = document.createElement('li');
-      li.style.cursor = 'pointer';
       var info = document.createElement('div'); info.className = 'info';
       var l1 = document.createElement('div'); l1.className = 'linea1';
-      var a = document.createElement('span'); a.textContent = nombreDia(x).replace(/^\w/, function (m) { return m.toUpperCase(); });
-      var b = document.createElement('span'); b.style.whiteSpace = 'nowrap';
-      b.textContent = '🚬 ' + valorDia(x, 'cigarros');
-      l1.append(a, b);
+      l1.textContent = '🚬 ' + t.hora;
       var l2 = document.createElement('div'); l2.className = 'linea2';
-      l2.textContent = fx.etiquetas.concat(fx.comida ? [fx.comida] : []).join(' · ') || '—';
+      l2.textContent = i ? 'después de ' + diferencia(lista[i - 1].hora, t.hora) : 'primero del día';
       info.append(l1, l2);
-      li.appendChild(info);
-      li.onclick = function () { cambiarDia(x); window.scrollTo(0, 0); };
-      if (x === dia) li.style.color = 'var(--accent)';
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'btn-sec'; b.textContent = 'Borrar';
+      b.onclick = function () {
+        if (!confirm('¿Borrar el tabaco de las ' + t.hora + '?')) return;
+        accionDeporte('tabacoBorrar', { id: t.id }, b, $('tab-msg')).catch(function () {});
+      };
+      li.append(info, b);
       ul.appendChild(li);
-    })(haceDias(j));
+    });
+  }
+
+  function diferencia(h1, h2) {
+    var m = function (h) { var p = h.split(':'); return Number(p[0]) * 60 + Number(p[1]); };
+    var d = m(h2) - m(h1);
+    return d < 60 ? d + ' min' : Math.floor(d / 60) + ' h' + (d % 60 ? ' ' + d % 60 + ' min' : '');
   }
 
   function cambiarDia(iso) {
     if (iso > hoy()) return;
-    if (dep.comidaSucia && iso !== dep.dia && !confirm('No guardaste la comida de ' + nombreDia(dep.dia).toLowerCase() + '. ¿Cambiar de día igual?')) return;
     dep.dia = iso;
-    dep.comidaSucia = false;
-    ['cig-msg', 'com-msg'].forEach(function (id) { $(id).hidden = true; });
+    dep.horaTocada = false;
+    $('tab-msg').hidden = true;
     pintarDiario();
   }
 
   $('dia-ant').addEventListener('click', function () { cambiarDia(sumarDias(dep.dia, -1)); });
   $('dia-sig').addEventListener('click', function () { cambiarDia(sumarDias(dep.dia, 1)); });
-  $('cig-mas').addEventListener('click', function () { sumarDia('cigarros', 1, $('cig-msg')); });
-  $('cig-menos').addEventListener('click', function () { sumarDia('cigarros', -1, $('cig-msg')); });
-  ['com-nota', 'com-peso'].forEach(function (id) {
-    $(id).addEventListener('input', function () { dep.comidaSucia = true; });
-  });
-  $('com-guardar').addEventListener('click', function () {
-    var pesoTxt = $('com-peso').value.trim().replace(',', '.');
-    if (pesoTxt && !(Number(pesoTxt) >= 30 && Number(pesoTxt) <= 250)) return mensaje($('com-msg'), 'Revisa el peso (ej: 72,5)', 'err');
-    var datos = { fecha: dep.dia, comida: $('com-nota').value.trim(), etiquetas: dep.tags.slice(), peso: pesoTxt ? Number(pesoTxt) : '' };
-    accionDeporte('diarioGuardar', datos, this, $('com-msg')).then(function () {
-      dep.comidaSucia = false;
+  $('tab-hora').addEventListener('input', function () { dep.horaTocada = true; });
+  $('tab-mas').addEventListener('click', function () {
+    var hora = $('tab-hora').value;
+    if (!hora) return mensaje($('tab-msg'), 'Elige la hora del tabaco', 'err');
+    $('tab-msg').hidden = true;
+    dep.enviandoTabaco = true;
+    accionDeporte('tabacoAgregar', { fecha: dep.dia, hora: hora }, this, $('tab-msg')).then(function () {
+      dep.enviandoTabaco = false;
+      dep.horaTocada = false;
       pintarDiario();
-      mensaje($('com-msg'), '✓ Guardado', 'ok');
-    }).catch(function () {});
+    }, function () { dep.enviandoTabaco = false; pintarDiario(); });
   });
 
   // ---------- Datos para los gráficos ----------
