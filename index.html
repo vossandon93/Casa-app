@@ -248,21 +248,6 @@
     }
     .subtabs button[aria-selected="true"] { background: var(--accent-fill); color: var(--on-accent); }
 
-    /* Rendición */
-    .foto-btn {
-      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 120px;
-      border: 2px dashed var(--border); border-radius: 14px; background: var(--bg); color: var(--muted);
-      font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; padding: 10px; overflow: hidden;
-    }
-    .foto-btn img { max-width: 100%; max-height: 220px; border-radius: 10px; }
-    .foto-btn.con-foto { border-style: solid; border-color: var(--accent); }
-    .estado {
-      border: 1px solid var(--border); background: none; border-radius: 999px; padding: 4px 10px;
-      font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; flex: none; color: var(--danger);
-    }
-    .estado.ok { color: var(--ok); background: var(--ok-soft); border-color: transparent; }
-    .lista .linea2 a { color: var(--accent); }
-
     /* Salud */
     .racha { text-align: center; padding: 6px 0 2px; }
     .racha .num { font-size: 64px; font-weight: 800; line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
@@ -335,7 +320,7 @@
     #tab-num { font-size: 56px; line-height: 1.1; }
     [data-tema="oscuro"] .card { border-color: transparent; }
     [data-tema="oscuro"] input, [data-tema="oscuro"] select,
-    [data-tema="oscuro"] .campo-fecha, [data-tema="oscuro"] .foto-btn { background-color: var(--campo); border-color: transparent; }
+    [data-tema="oscuro"] .campo-fecha { background-color: var(--campo); border-color: transparent; }
     [data-tema="oscuro"] input::placeholder { color: #6e6e73; }
     [data-tema="oscuro"] .tabs { background: rgba(28, 28, 30, .82); border-color: transparent; box-shadow: 0 8px 24px rgba(0,0,0,.6); }
     [data-tema="oscuro"] .subtabs { border-color: transparent; }
@@ -357,12 +342,12 @@
     /* iPad y pantallas anchas: dos columnas en vez de una tira angosta. */
     @media (min-width: 760px) {
       main { max-width: 920px; padding: 24px; }
-      #pag-anotar, #pag-resumen, #pag-meses, #pag-rendicion, #pag-salud {
+      #pag-anotar, #pag-resumen, #pag-meses, #pag-salud {
         display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start;
       }
-      #pag-anotar > *, #pag-resumen > *, #pag-meses > *, #pag-rendicion > *, #pag-salud > * { margin: 0; grid-column: 2; }
+      #pag-anotar > *, #pag-resumen > *, #pag-meses > *, #pag-salud > * { margin: 0; grid-column: 2; }
       #pag-anotar > :first-child, #pag-resumen > :first-child, #pag-meses > :first-child,
-      #pag-rendicion > :first-child, #pag-salud > :first-child { grid-column: 1; grid-row: 1 / span 6; }
+      #pag-salud > :first-child { grid-column: 1; grid-row: 1 / span 6; }
       #pag-salud { grid-auto-flow: row dense; }
       #pag-salud > :first-child { grid-row: auto; }
       #pag-salud .prot-cont > * { margin: 0; grid-column: 2; }
@@ -433,7 +418,6 @@
     <!-- Burbuja principal: secciones -->
     <nav class="tabs" id="secciones" role="tablist">
       <button type="button" role="tab" data-sec="casa" aria-selected="true">🏠 Casa</button>
-      <button type="button" role="tab" data-sec="rendicion" aria-selected="false" hidden>🧾 Rendición</button>
       <button type="button" role="tab" data-sec="salud" aria-selected="false" hidden>💪 Salud</button>
       <button type="button" role="tab" data-sec="deporte" aria-selected="false" hidden>🏋️ Deporte</button>
     </nav>
@@ -567,35 +551,6 @@
       <section class="card">
         <h2 id="quien-titulo">Quién anotó</h2>
         <ul class="leyenda" id="quien"></ul>
-      </section>
-    </div>
-
-    <!-- Rendición (pestaña personal de Vicente) -->
-    <div id="pag-rendicion" hidden>
-      <form class="card" id="form-rend" novalidate>
-        <input id="rend-archivo" type="file" accept="image/*,application/pdf" hidden>
-        <button class="foto-btn" id="rend-foto" type="button"><span style="font-size:32px">📷</span>Sacar o elegir foto del comprobante</button>
-
-        <label for="rend-monto">Monto</label>
-        <input id="rend-monto" class="monto" type="text" inputmode="numeric" placeholder="$0" autocomplete="off">
-
-        <label for="rend-desc">Descripción</label>
-        <input id="rend-desc" type="text" maxlength="200" placeholder="Ej: almuerzo con cliente, taxi…" autocomplete="off">
-
-        <label for="rend-fecha">Fecha</label>
-        <input id="rend-fecha" type="date">
-
-        <button class="btn" id="rend-guardar" type="submit">Guardar y enviar correo</button>
-        <div id="rend-msg" class="msg" hidden></div>
-      </form>
-
-      <section class="card">
-        <div class="total">Pendiente de reembolso: <strong id="rend-pendiente">—</strong></div>
-      </section>
-
-      <section class="card">
-        <h2>Mis rendiciones</h2>
-        <ul class="lista" id="rend-lista"></ul>
       </section>
     </div>
 
@@ -896,13 +851,13 @@
   // En la burbuja de arriba todos ven "Casa" y cada persona además sus secciones.
   // La clave es el nombre de la hoja Personas en minúsculas y sin tildes.
   // Para agregar una sección nueva: un botón data-sec en #secciones, su div pag-xxx y su nombre aquí.
-  var PESTANAS_DE = { vicente: ['rendicion', 'deporte'], fran: ['salud'] };
+  var PESTANAS_DE = { vicente: ['deporte'], fran: ['salud'] };
   // Secciones con su propia burbuja de pestañas (la primera es la que se abre).
   var SUBPAGINAS = {
     casa: ['anotar', 'resumen', 'meses'],
     deporte: ['dep-hoy', 'dep-registro', 'dep-progreso', 'dep-diario']
   };
-  var PAGINAS = ['anotar', 'resumen', 'meses', 'rendicion', 'salud', 'dep-hoy', 'dep-registro', 'dep-progreso', 'dep-diario'];
+  var PAGINAS = ['anotar', 'resumen', 'meses', 'salud', 'dep-hoy', 'dep-registro', 'dep-progreso', 'dep-diario'];
 
   function seccionDe(p) {
     for (var s in SUBPAGINAS) if (SUBPAGINAS[s].indexOf(p) !== -1) return s;
@@ -1249,7 +1204,6 @@
     if (sec !== 'deporte') $('dep-msg').hidden = true;
     window.scrollTo(0, 0);
     if (p === 'resumen' || p === 'meses') cargarResumen();
-    if (p === 'rendicion') cargarRendiciones();
     if (p === 'salud') cargarSalud();
     if (sec === 'deporte') cargarDeporte();
   }
@@ -1311,169 +1265,6 @@
   });
 
   function soloNumero(el) { return Number(el.value.replace(/\D/g, '')) || 0; }
-
-  // ---------- Rendición: gasto + foto, con correo automático ----------
-  var rend = { foto: null, cargado: false };
-
-  $('rend-foto').addEventListener('click', function () { $('rend-archivo').click(); });
-  $('rend-monto').addEventListener('input', function () {
-    var n = soloNumero(this);
-    this.value = n ? clp.format(n) : '';
-  });
-
-  $('rend-archivo').addEventListener('change', function () {
-    var file = this.files[0];
-    this.value = '';
-    if (!file) return;
-    var btn = $('rend-foto');
-    btn.textContent = 'Preparando…';
-    prepararArchivo(file).then(function (foto) {
-      rend.foto = foto;
-      btn.innerHTML = '';
-      btn.classList.add('con-foto');
-      if (foto.tipo === 'application/pdf') {
-        btn.textContent = '📄 ' + file.name + ' · tocar para cambiar';
-      } else {
-        var img = document.createElement('img');
-        img.src = 'data:' + foto.tipo + ';base64,' + foto.base64;
-        img.alt = 'Comprobante';
-        btn.appendChild(img);
-        btn.appendChild(document.createTextNode('Tocar para cambiar'));
-      }
-    }).catch(function (err) {
-      limpiarFoto();
-      mensaje($('rend-msg'), err.message, 'err');
-    });
-  });
-
-  function limpiarFoto() {
-    rend.foto = null;
-    var btn = $('rend-foto');
-    btn.classList.remove('con-foto');
-    btn.innerHTML = '<span style="font-size:32px">📷</span>Sacar o elegir foto del comprobante';
-  }
-
-  // Las fotos se achican a 1600 px en JPEG (≈300 KB) para que suban rápido.
-  function prepararArchivo(file) {
-    if (file.type === 'application/pdf') {
-      if (file.size > 10 * 1024 * 1024) return Promise.reject(new Error('El PDF es muy grande (máx. 10 MB)'));
-      return new Promise(function (ok, mal) {
-        var r = new FileReader();
-        r.onload = function () { ok({ tipo: file.type, base64: String(r.result).split(',')[1] }); };
-        r.onerror = function () { mal(new Error('No se pudo leer el archivo')); };
-        r.readAsDataURL(file);
-      });
-    }
-    return new Promise(function (ok, mal) {
-      var url = URL.createObjectURL(file);
-      var img = new Image();
-      img.onload = function () {
-        var MAX = 1600;
-        var k = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
-        var c = document.createElement('canvas');
-        c.width = Math.round(img.naturalWidth * k);
-        c.height = Math.round(img.naturalHeight * k);
-        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        URL.revokeObjectURL(url);
-        ok({ tipo: 'image/jpeg', base64: c.toDataURL('image/jpeg', 0.8).split(',')[1] });
-      };
-      img.onerror = function () { URL.revokeObjectURL(url); mal(new Error('No se pudo abrir la foto. Prueba con otra.')); };
-      img.src = url;
-    });
-  }
-
-  $('form-rend').addEventListener('submit', function (e) {
-    e.preventDefault();
-    var msg = $('rend-msg');
-    var monto = soloNumero($('rend-monto'));
-    var desc = $('rend-desc').value.trim();
-    if (!rend.foto) return mensaje(msg, 'Agrega la foto del comprobante', 'err');
-    if (!monto) return mensaje(msg, 'Ingresa el monto', 'err');
-    if (!desc) return mensaje(msg, 'Escribe una descripción', 'err');
-    var boton = $('rend-guardar');
-    boton.disabled = true;
-    boton.textContent = 'Subiendo y enviando…';
-    api('rendicionAdd', {
-      monto: monto, descripcion: desc, fecha: $('rend-fecha').value || hoy(), persona: estado.persona,
-      foto: rend.foto.base64, fotoTipo: rend.foto.tipo
-    }).then(function (res) {
-      var c = res.correo || {};
-      mensaje(msg, c.enviado
-        ? '✓ Guardada y enviada por correo a ' + c.para
-        : '✓ Guardada, pero el correo no salió. ' + (c.texto || ''), c.enviado ? 'ok' : 'err');
-      $('rend-monto').value = '';
-      $('rend-desc').value = '';
-      $('rend-fecha').value = hoy();
-      limpiarFoto();
-      pintarRendiciones(res);
-    }).catch(function (err) {
-      mensaje(msg, 'No se guardó: ' + scriptViejo(err), 'err');
-    }).then(function () {
-      boton.disabled = false;
-      boton.textContent = 'Guardar y enviar correo';
-    });
-  });
-
-  function cargarRendiciones() {
-    $('rend-fecha').max = hoy();
-    if (!$('rend-fecha').value) $('rend-fecha').value = hoy();
-    if (!rend.cargado) mensajeLista($('rend-lista'), 'Cargando…');
-    api('rendiciones').then(pintarRendiciones).catch(function (err) {
-      mensajeLista($('rend-lista'), 'No se pudo cargar: ' + scriptViejo(err));
-    });
-  }
-
-  function pintarRendiciones(res) {
-    rend.cargado = true;
-    $('rend-pendiente').textContent = clp.format(res.pendiente || 0);
-    var ul = $('rend-lista');
-    ul.innerHTML = '';
-    if (!res.rendiciones.length) return mensajeLista(ul, 'Todavía no hay rendiciones.');
-    res.rendiciones.forEach(function (r) {
-      var li = document.createElement('li');
-      var info = document.createElement('div'); info.className = 'info';
-      var l1 = document.createElement('div'); l1.className = 'linea1';
-      var d = document.createElement('span'); d.textContent = r.descripcion;
-      d.style.cssText = 'min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
-      var m = document.createElement('span'); m.textContent = clp.format(r.monto);
-      l1.append(d, m);
-      var l2 = document.createElement('div'); l2.className = 'linea2';
-      l2.append(fechaCorta(r.fecha) + ' · ');
-      if (r.foto) {
-        var a = document.createElement('a');
-        a.href = r.foto; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'ver foto';
-        l2.append(a, ' · ');
-      }
-      l2.append(/^Enviado/.test(r.correo) ? '✉️ enviado' : '⚠️ sin correo');
-      l2.title = r.correo || '';
-      info.append(l1, l2);
-
-      var est = document.createElement('button');
-      est.type = 'button';
-      var pagada = r.estado === 'Reembolsada';
-      est.className = 'estado' + (pagada ? ' ok' : '');
-      est.textContent = pagada ? 'Pagada' : 'Pendiente';
-      est.setAttribute('aria-label', 'Marcar como ' + (pagada ? 'pendiente' : 'reembolsada'));
-      est.addEventListener('click', function () {
-        est.disabled = true;
-        api('rendicionEstado', { id: r.id, estado: pagada ? 'Pendiente' : 'Reembolsada' })
-          .then(pintarRendiciones)
-          .catch(function (err) { est.disabled = false; alert('No se pudo cambiar: ' + err.message); });
-      });
-
-      var b = document.createElement('button');
-      b.type = 'button'; b.className = 'borrar'; b.textContent = '✕';
-      b.setAttribute('aria-label', 'Borrar rendición');
-      b.addEventListener('click', function () {
-        if (!confirm('¿Borrar la rendición ' + r.descripcion + ' ' + clp.format(r.monto) + '? La foto se va a la papelera de Drive.')) return;
-        b.disabled = true;
-        api('rendicionDelete', { id: r.id }).then(pintarRendiciones)
-          .catch(function (err) { b.disabled = false; alert('No se pudo borrar: ' + err.message); });
-      });
-      li.append(info, est, b);
-      ul.appendChild(li);
-    });
-  }
 
   // ---------- Salud: días sin azúcar (la proteína es el componente montarProteina) ----------
   var salud = { datos: null };
