@@ -116,11 +116,10 @@ Sin esto la app se protege solo con el PIN (con límite: 5 intentos fallidos blo
 - **verSesiones**: muestra qué cuentas tienen sesión abierta. **cerrarTodasLasSesiones**: obliga a todos a entrar de nuevo con Google (úsalo si pierdes un equipo).
 - Para volver al PIN, borra `CORREOS_PERMITIDOS`.
 
-## Pestañas personales (Rendición, Deporte y Salud)
+## Pestañas personales (Deporte y Salud)
 
 Además de las pestañas comunes, cada persona ve las suyas según quién eligió al entrar:
 
-- **Vicente → Rendición:** sube la foto del comprobante (o un PDF), el monto y la descripción. La foto queda en la carpeta **Rendiciones - comprobantes** de tu Google Drive, la fila en la hoja **Rendiciones** y se envía un correo automático con la foto adjunta. Cada rendición se puede marcar como *Pagada* cuando te la reembolsen.
 - **Vicente → Deporte:** cuatro pestañas.
   - **Hoy:** sugiere qué zona toca según lo que llevas más días sin trabajar y arma una rutina de ~60 min (calentamiento, rodilla, fuerza, core, cardio, calma). Cada ejercicio se puede cambiar (↻) o dejar de proponer (✕). Los saltos e impacto están apagados por la rodilla.
   - **Registro:** qué hiciste cada día (Upper, Lower, Core, Cardio, Full body, Movilidad), minutos y ejercicios con series/peso. Queda en la hoja **Entrenamientos**.
@@ -132,9 +131,10 @@ Además de las pestañas comunes, cada persona ve las suyas según quién eligi�
 Para activarlas (una sola vez):
 
 1. Pega el `Code.gs` nuevo en Apps Script y guarda.
-2. En **Propiedades del script** agrega `CORREO_RENDICION` con el correo al que deben llegar las rendiciones (puedes poner varios separados por coma).
-3. Elige la función **setup** y presiona **Ejecutar**. Google pedirá permisos nuevos (Drive para guardar las fotos y Gmail para enviar el correo): acéptalos igual que la primera vez.
-4. **Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.**
+2. Elige la función **setup** y presiona **Ejecutar**.
+3. **Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.**
+
+> La rendición de gastos se movió a su propia app (repositorio Rendicion-app). La hoja **Rendiciones** que ya existía queda en la planilla tal cual; puedes borrarla o copiarla cuando quieras.
 
 > Qué pestañas ve cada uno se define en `index.html`, en `PESTANAS_DE`. Ojo: es una separación de comodidad, no de seguridad; los dos usan el mismo PIN.
 
